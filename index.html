@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutor 课后反馈生成器</title>
+<style>
+  :root {
+    --bg: #f5f3f0;
+    --card: #fff;
+    --text: #2c2416;
+    --muted: #8c8273;
+    --border: #e0d9ce;
+    --accent: #b8753e;
+    --accent-hover: #9a6234;
+    --tag-bg: #faf7f2;
+    --danger: #c44;
+    --danger-hover: #a33;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1b17;
+      --card: #29241d;
+      --text: #e8ddd0;
+      --muted: #9c9484;
+      --border: #3d3529;
+      --accent: #d49550;
+      --accent-hover: #e0a865;
+      --tag-bg: #2f2920;
+      --danger: #f66;
+      --danger-hover: #e55;
+      --shadow: 0 1px 3px rgba(0,0,0,.3);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 20px 0 4px;
+  }
+  .header h1 {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  .header .sub {
+    font-size: .85rem;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* Settings row */
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+  .settings-row input {
+    flex: 1;
+    padding: 6px 10px;
+    font-size: .8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    font-family: monospace;
+  }
+  .settings-row button {
+    padding: 6px 14px;
+    font-size: .8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card);
+    color: var(--text);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .settings-row button:hover { background: var(--tag-bg); }
+  .key-saved { color: #5a8; font-size: .75rem; white-space: nowrap; }
+
+  /* Card */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card-title {
+    font-size: .95rem;
+    font-weight: 600;
+    margin-bottom: 14px;
+  }
+
+  /* Form */
+  .field { margin-bottom: 14px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block;
+    font-size: .82rem;
+    font-weight: 500;
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .field .hint {
+    font-size: .72rem;
+    color: var(--muted);
+    font-weight: 400;
+    margin-left: 4px;
+  }
+  .field input[type="text"],
+  .field textarea {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: .88rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card);
+    color: var(--text);
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color .15s;
+  }
+  .field input[type="text"]:focus,
+  .field textarea:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .field textarea { min-height: 88px; }
+  .field input.small { max-width: 260px; }
+
+  /* Radio group */
+  .radio-group {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .radio-group input[type="radio"] { display: none; }
+  .radio-group label {
+    display: inline-block;
+    padding: 6px 18px;
+    font-size: .84rem;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--card);
+    color: var(--muted);
+  }
+  .radio-group input[type="radio"]:checked + label {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+  }
+  .btn {
+    padding: 10px 22px;
+    font-size: .88rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: all .15s;
+    font-family: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+  }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-primary:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+  }
+  .btn-ghost {
+    background: var(--card);
+    color: var(--text);
+  }
+  .btn-ghost:hover { background: var(--tag-bg); }
+
+  /* Output */
+  .output-area {
+    min-height: 100px;
+    padding: 16px;
+    background: var(--tag-bg);
+    border-radius: 8px;
+    font-size: .9rem;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+  }
+  .output-placeholder {
+    color: var(--muted);
+    font-size: .85rem;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #333;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 20px;
+    font-size: .84rem;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity .25s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* History */
+  .history-item {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: .75rem;
+    color: var(--muted);
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  .history-meta .tag {
+    display: inline-block;
+    padding: 1px 10px;
+    border-radius: 10px;
+    font-size: .72rem;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+  }
+  .history-text {
+    font-size: .85rem;
+    line-height: 1.65;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .history-actions {
+    margin-top: 6px;
+    display: flex;
+    gap: 10px;
+  }
+  .history-actions button {
+    font-size: .78rem;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 2px 0;
+  }
+  .history-actions button:hover { color: var(--accent); }
+  .history-actions button.danger:hover { color: var(--danger); }
+
+  .empty-state {
+    text-align: center;
+    color: var(--muted);
+    font-size: .84rem;
+    padding: 24px 0;
+  }
+
+  /* Loading dots */
+  @keyframes dots { 0%, 20% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+  .loading-dots span {
+    animation: dots 1.4s infinite;
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+  }
+  .loading-dots span:nth-child(2) { animation-delay: .2s; }
+  .loading-dots span:nth-child(3) { animation-delay: .4s; }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .container { padding: 12px 10px 36px; }
+    .card { padding: 14px; }
+    .btn-row { flex-direction: column; }
+    .btn { justify-content: center; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <h1>Tutor 课后反馈生成器</h1>
+    <div class="sub">把课堂随记变成自然、得体的家长反馈</div>
+  </div>
+
+  <!-- Settings -->
+  <div class="settings-row">
+    <input type="password" id="apiKey" placeholder="输入 DeepSeek API Key（本地存储）">
+    <button id="saveKey">保存</button>
+    <span class="key-saved" id="keyStatus"></span>
+  </div>
+
+  <!-- Input Card -->
+  <div class="card">
+    <div class="card-title">课堂信息</div>
+
+    <div class="field">
+      <label>学生名字</label>
+      <input type="text" id="studentName" class="small" placeholder="如：小明" maxlength="20">
+    </div>
+
+    <div class="field">
+      <label>课程类型</label>
+      <div class="radio-group">
+        <input type="radio" name="type" id="type_regular" value="regular" checked>
+        <label for="type_regular">正课</label>
+        <input type="radio" name="type" id="type_review" value="review">
+        <label for="type_review">复习课</label>
+        <input type="radio" name="type" id="type_trial" value="trial">
+        <label for="type_trial">试听课</label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>课堂情况 <span class="hint">（必填，想到什么写什么）</span></label>
+      <textarea id="notes" placeholder="例：今天学了很多单词，孩子大部分都认识，基础很好，不认识的词回去多复习，重点记一下 present。"></textarea>
+    </div>
+
+    <div class="field">
+      <label>复习重点 <span class="hint">（选填）</span></label>
+      <input type="text" id="focus" placeholder="如：present 的三种用法" maxlength="100">
+    </div>
+
+    <div class="field">
+      <label>重点单词 <span class="hint">（选填，逗号分隔）</span></label>
+      <input type="text" id="words" placeholder="如：present, boring, theatre" maxlength="100">
+    </div>
+
+    <div class="field">
+      <label>语气</label>
+      <div class="radio-group">
+        <input type="radio" name="tone" id="tone_warm" value="warm" checked>
+        <label for="tone_warm">亲切</label>
+        <input type="radio" name="tone" id="tone_formal" value="formal">
+        <label for="tone_formal">正式</label>
+        <input type="radio" name="tone" id="tone_lively" value="lively">
+        <label for="tone_lively">活泼</label>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="generateBtn" onclick="generate()">生成反馈</button>
+      <button class="btn btn-ghost" onclick="clearForm()">清空</button>
+    </div>
+    <div style="font-size:.72rem;color:var(--muted);margin-top:8px">提示：Ctrl+Enter 快速生成</div>
+  </div>
+
+  <!-- Output Card -->
+  <div class="card" id="outputCard" style="display:none;">
+    <div class="card-title">生成结果</div>
+    <div class="output-area" id="output"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="copyOutput()">复制</button>
+      <button class="btn btn-ghost" id="regenerateBtn" onclick="regenerate()" disabled>换种说法</button>
+      <button class="btn btn-ghost" id="saveHistoryBtn" onclick="saveToHistory()" disabled>保存到历史</button>
+    </div>
+  </div>
+
+  <!-- History Card -->
+  <div class="card">
+    <div class="card-title">历史记录 <span style="font-weight:400;font-size:.78rem;color:var(--muted)" id="historyCount"></span></div>
+    <div id="historyList"><div class="empty-state">暂无记录</div></div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// System Prompt
+// ============================================================
+const SYSTEM_PROMPT = `你是一名经验丰富的中国补课老师，正在通过微信给家长写课后反馈。你的核心职责：根据课堂笔记，生成一段自然、真诚的课后反馈，直接发给家长。
+
+## 输出规则（必须遵守）
+
+1. 输出必须是纯文本，只包含反馈正文。
+2. 禁止出现标题、编号、项目符号、Markdown、斜体、加粗、emoji（除非用户语气选了"活泼"，可以用 1-2 个表情）。
+3. 禁止出现"以下是""当然可以""这是一段反馈""好的，我来写"等 AI 开场白或自述语。直接开始写反馈正文。
+4. 禁止套用固定模板。每份反馈要有不同的句式和结构，不要每次都用"今天学习了……表现……希望……"。
+5. 禁止空洞夸奖，比如"表现非常好""真的很棒"。要写具体：孩子哪个知识点掌握得快、课堂上哪个环节积极、哪个地方需要加强。
+6. 字数控制在 80-150 字之间。
+
+## 语气要求
+
+根据用户指定的语气调整：
+- 亲切：像朋友聊天，自然随意，用"呢""哦""哈"等语气词点缀，像一条微信消息。
+- 正式：用词规范，结构清楚，但保留温度，不用语气词。
+- 活泼：可以加一两个表情符号，语气轻松欢快。
+
+关键原则：读起来要像真人老师匆忙打完字发出去的感觉，不要像 AI 写的文章。
+
+## 课程类型区分
+
+正课反馈：
+- 重点写今天学了什么内容，孩子在课堂上的具体表现。
+- 指出掌握得好的地方和需要巩固的地方。
+- 给出明确的课后复习建议。
+
+复习课反馈：
+- 重点写对之前内容的掌握程度，哪些记牢了、哪些生疏了。
+- 指出薄弱环节，建议怎么复习。
+- 可以和之前的表现做对比，但不要过度。
+
+试听课反馈：
+- 重点写孩子的基础情况、课堂适应度、学习习惯。
+- 给出后续学习建议，但不要硬推销课程。
+
+## 学生名字
+
+- 必须在反馈中自然地提到学生名字 1-2 次，不要每句话都带名字。
+
+## 重点单词和内容
+
+- 如果用户提供了重点单词（如 boring、present、theatre），必须在反馈中自然提及，不要遗漏任何一个。
+- 如果用户提供了复习重点内容，反馈中要体现这方面的建议。
+- 如果用户提到某个单词孩子记不住，温和地提醒家长课后帮助复习。
+
+## 避免重复
+
+- 如果用户提供了上一次的反馈内容并要求避免重复，请换一种完全不同的句式和表达方式。调整句子顺序、用不同词汇、改变段落结构。开头和结尾必须不同。
+
+## 关键提醒
+
+- 不要编造用户没提供的信息，不要加入虚假的课堂内容。
+- 保持中文表达流畅，避免 AI 腔和翻译腔。
+- 直接用老师的第一人称视角写，但不要出现"我"字开头的句子过多。`;
+
+// ============================================================
+// State
+// ============================================================
+let lastResult = '';
+let lastFormData = null;
+
+// ============================================================
+// Init
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadApiKey();
+  renderHistory();
+  document.getElementById('studentName').focus();
+
+  // Ctrl+Enter to generate
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      generate();
+    }
+  });
+});
+
+// ============================================================
+// API Key
+// ============================================================
+function getApiKey() {
+  return localStorage.getItem('tutor_deepseek_key') || '';
+}
+
+function loadApiKey() {
+  const key = getApiKey();
+  if (key) {
+    document.getElementById('apiKey').value = key;
+    document.getElementById('keyStatus').textContent = '已保存';
+  }
+}
+
+document.getElementById('saveKey').addEventListener('click', () => {
+  const key = document.getElementById('apiKey').value.trim();
+  if (!key) {
+    document.getElementById('keyStatus').textContent = '请输入 Key';
+    return;
+  }
+  localStorage.setItem('tutor_deepseek_key', key);
+  document.getElementById('keyStatus').textContent = '已保存';
+  setTimeout(() => { document.getElementById('keyStatus').textContent = ''; }, 2000);
+});
+
+// ============================================================
+// Form helpers
+// ============================================================
+function getFormData() {
+  const typeEls = document.getElementsByName('type');
+  let type = 'regular';
+  for (const el of typeEls) { if (el.checked) { type = el.value; break; } }
+
+  const toneEls = document.getElementsByName('tone');
+  let tone = 'warm';
+  for (const el of toneEls) { if (el.checked) { tone = el.value; break; } }
+
+  return {
+    student: document.getElementById('studentName').value.trim(),
+    type,
+    notes: document.getElementById('notes').value.trim(),
+    focus: document.getElementById('focus').value.trim(),
+    words: document.getElementById('words').value.trim(),
+    tone,
+  };
+}
+
+function clearForm() {
+  document.getElementById('studentName').value = '';
+  document.getElementById('notes').value = '';
+  document.getElementById('focus').value = '';
+  document.getElementById('words').value = '';
+  document.getElementById('type_regular').checked = true;
+  document.getElementById('tone_warm').checked = true;
+  lastResult = '';
+  lastFormData = null;
+  document.getElementById('outputCard').style.display = 'none';
+  document.getElementById('output').textContent = '';
+  document.getElementById('studentName').focus();
+}
+
+// ============================================================
+// Build user message
+// ============================================================
+function buildUserMessage(data, previousResult) {
+  const typeLabel = { regular: '正课反馈', review: '复习报告', trial: '试听课反馈' }[data.type];
+  const toneLabel = { warm: '亲切', formal: '正式', lively: '活泼' }[data.tone];
+
+  let msg = `请写一份${typeLabel}。\n\n`;
+  msg += `学生名字：${data.student}\n`;
+  msg += `语气：${toneLabel}\n`;
+  msg += `课堂情况：${data.notes}\n`;
+
+  if (data.focus) msg += `复习重点：${data.focus}\n`;
+  if (data.words) msg += `重点单词：${data.words}\n`;
+  if (previousResult) {
+    msg += `\n上一次的反馈内容是：「${previousResult}」\n请换一种完全不同的表达方式，不要和上一次一样。`;
+  }
+
+  return msg;
+}
+
+// ============================================================
+// Generate
+// ============================================================
+async function generate(previousResult) {
+  const data = getFormData();
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    toast('请先填写并保存 DeepSeek API Key');
+    return;
+  }
+  if (!data.notes) {
+    toast('请填写课堂情况');
+    return;
+  }
+  if (!data.student) {
+    toast('请填写学生名字');
+    return;
+  }
+
+  lastFormData = data;
+
+  const btn = document.getElementById('generateBtn');
+  const regenBtn = document.getElementById('regenerateBtn');
+  const outCard = document.getElementById('outputCard');
+  const outEl = document.getElementById('output');
+
+  btn.disabled = true;
+  btn.textContent = '生成中';
+  outCard.style.display = 'block';
+  outEl.innerHTML = '<span class="loading-dots"><span>.</span><span>.</span><span>.</span></span>';
+  regenBtn.disabled = true;
+
+  try {
+    const userMessage = buildUserMessage(data, previousResult || null);
+
+    const res = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'deepseek-chat',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userMessage },
+        ],
+        temperature: previousResult ? 0.95 : 0.82,
+        max_tokens: 400,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API 请求失败 (${res.status})`);
+    }
+
+    const json = await res.json();
+    const result = json.choices?.[0]?.message?.content?.trim() || '';
+
+    if (!result) throw new Error('API 返回为空');
+
+    lastResult = result;
+    outEl.textContent = result;
+    document.getElementById('saveHistoryBtn').disabled = false;
+  } catch (err) {
+    outEl.textContent = '生成失败：' + err.message;
+    document.getElementById('saveHistoryBtn').disabled = true;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = previousResult ? '重新生成' : '生成反馈';
+    regenBtn.disabled = false;
+  }
+}
+
+function regenerate() {
+  generate(lastResult);
+}
+
+// ============================================================
+// Copy
+// ============================================================
+async function copyOutput() {
+  const text = document.getElementById('output').textContent;
+  if (!text || text.startsWith('生成失败')) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('已复制到剪贴板');
+  } catch {
+    // Fallback
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制到剪贴板');
+  }
+}
+
+// ============================================================
+// History
+// ============================================================
+function getHistory() {
+  try {
+    return JSON.parse(localStorage.getItem('tutor_feedback_history') || '[]');
+  } catch { return []; }
+}
+
+function saveToHistory() {
+  if (!lastResult || !lastFormData) return;
+
+  const history = getHistory();
+  const entry = {
+    id: Date.now().toString(),
+    createdAt: new Date().toISOString(),
+    student: lastFormData.student,
+    type: lastFormData.type,
+    feedback: lastResult,
+  };
+  history.unshift(entry);
+
+  // Keep last 50
+  if (history.length > 50) history.length = 50;
+
+  localStorage.setItem('tutor_feedback_history', JSON.stringify(history));
+  renderHistory();
+  toast('已保存到历史记录');
+}
+
+function deleteHistory(id) {
+  let history = getHistory();
+  history = history.filter(h => h.id !== id);
+  localStorage.setItem('tutor_feedback_history', JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory() {
+  const history = getHistory();
+  const el = document.getElementById('historyList');
+  const countEl = document.getElementById('historyCount');
+
+  countEl.textContent = history.length ? `(${history.length})` : '';
+
+  if (!history.length) {
+    el.innerHTML = '<div class="empty-state">暂无记录</div>';
+    return;
+  }
+
+  const typeLabels = { regular: '正课', review: '复习课', trial: '试听课' };
+
+  el.innerHTML = history.map(h => `
+    <div class="history-item">
+      <div class="history-meta">
+        <span>${formatDate(h.createdAt)}</span>
+        <span>${escapeHtml(h.student)}</span>
+        <span class="tag">${typeLabels[h.type] || h.type}</span>
+      </div>
+      <div class="history-text">${escapeHtml(h.feedback)}</div>
+      <div class="history-actions">
+        <button onclick="copyHistory('${h.id}')">复制</button>
+        <button class="danger" onclick="deleteHistory('${h.id}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function copyHistory(id) {
+  const history = getHistory();
+  const entry = history.find(h => h.id === id);
+  if (!entry) return;
+
+  navigator.clipboard.writeText(entry.feedback).then(() => {
+    toast('已复制到剪贴板');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = entry.feedback;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制到剪贴板');
+  });
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+function formatDate(iso) {
+  const d = new Date(iso);
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function escapeHtml(s) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(s));
+  return div.innerHTML;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+}
+</script>
+</body>
+</html>
