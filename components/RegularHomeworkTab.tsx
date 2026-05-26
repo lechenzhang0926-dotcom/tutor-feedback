@@ -10,10 +10,7 @@ interface Props {
 
 export function RegularHomeworkTab({ toast, onCopy }: Props) {
   const [studentName, setStudentName] = useState('');
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+  const [date, setDate] = useState(() => beijingDateString());
   const [link1, setLink1] = useState('');
   const [link2, setLink2] = useState('');
   const [link3, setLink3] = useState('');
@@ -26,11 +23,10 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
   // --------------- 格式化日期 ---------------
 
   const getFormattedDate = useCallback(() => {
-    const d = new Date(date);
-    if (isNaN(d.getTime())) return '';
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${m}${day}`;
+    // 从 date 字符串解析月日，固定北京时间
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (!match) return '';
+    return `${match[2]}${match[3]}`;
   }, [date]);
 
   // --------------- 生成群消息 ---------------
@@ -296,4 +292,15 @@ function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** 获取当前北京时间（UTC+8）的 YYYY-MM-DD 字符串 */
+function beijingDateString(): string {
+  const now = new Date();
+  // 转为北京时间：UTC + 偏移量 + 8小时
+  const beijingTime = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
+  const y = beijingTime.getFullYear();
+  const m = String(beijingTime.getMonth() + 1).padStart(2, '0');
+  const d = String(beijingTime.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
