@@ -28,7 +28,9 @@ export function RegularFeedbackTab({ toast }: Props) {
   const [feedbackLength, setFeedbackLength] = useState<'short' | 'standard' | 'detailed'>('standard');
   const [notes, setNotes] = useState('');
   const [claudeResult, setClaudeResult] = useState('');
-  const [feedback, setFeedback] = useState('');
+  const [feedbackVersions, setFeedbackVersions] = useState<string[]>([]);
+  const [currentVersion, setCurrentVersion] = useState(0);
+  const feedback = feedbackVersions[currentVersion] || '';
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [error, setError] = useState('');
@@ -126,7 +128,6 @@ export function RegularFeedbackTab({ toast }: Props) {
 
     setLoading(true);
     setError('');
-    setFeedback('');
 
     // 获取学生档案（如果选中了学生）
     const student = selectedStudentId ? getStudentById(selectedStudentId) : undefined;
@@ -151,7 +152,12 @@ export function RegularFeedbackTab({ toast }: Props) {
         return;
       }
 
-      setFeedback(data.feedback);
+      // 版本管理：新版本插入最前，最多 5 个
+      setFeedbackVersions((prev) => {
+        const next = [data.feedback, ...prev];
+        return next.slice(0, 5);
+      });
+      setCurrentVersion(0);
       incrementDailyCount();
       setRemaining(getRemainingToday());
 
@@ -300,7 +306,7 @@ export function RegularFeedbackTab({ toast }: Props) {
           </button>
           <button
             className="btn btn-ghost"
-            onClick={() => { setNotes(''); setClaudeResult(''); setFeedback(''); setError(''); clearImage(); }}
+            onClick={() => { setNotes(''); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); }}
           >
             清空
           </button>
@@ -319,9 +325,16 @@ export function RegularFeedbackTab({ toast }: Props) {
       </div>
 
       {/* Output Card */}
-      {(loading || error || feedback) && (
+      {(loading || error || feedbackVersions.length > 0) && (
         <div className="card">
-          <div className="card-title">生成结果</div>
+          <div className="card-title">
+            生成结果
+            {feedbackVersions.length > 1 && (
+              <span style={{ fontWeight: 400, fontSize: '.78rem', color: 'var(--muted)', marginLeft: 8 }}>
+                — 版本切换
+              </span>
+            )}
+          </div>
 
           {loading && (
             <div className="output-area">
@@ -331,12 +344,28 @@ export function RegularFeedbackTab({ toast }: Props) {
             </div>
           )}
 
-          {!loading && error && (
+          {!loading && error && !feedback && (
             <div style={{ color: 'var(--danger)', fontSize: '.9rem' }}>{error}</div>
           )}
 
-          {!loading && feedback && (
+          {!loading && feedbackVersions.length > 0 && (
             <>
+              {feedbackVersions.length > 1 && (
+                <div className="radio-group" style={{ marginBottom: 10 }}>
+                  {feedbackVersions.map((_, i) => (
+                    <span key={i}>
+                      <input
+                        type="radio"
+                        name="version"
+                        id={`v${i}`}
+                        checked={currentVersion === i}
+                        onChange={() => setCurrentVersion(i)}
+                      />
+                      <label htmlFor={`v${i}`}>版本{i + 1}</label>
+                    </span>
+                  ))}
+                </div>
+              )}
               <div className="output-area">{feedback}</div>
               <div className="btn-row">
                 <button className="btn btn-primary" onClick={handleCopy}>复制</button>
