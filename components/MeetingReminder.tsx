@@ -21,6 +21,28 @@ export function MeetingReminder({ toast, onCopy }: Props) {
   const [meetingTime, setMeetingTime] = useState('');
   const [message, setMessage] = useState('');
 
+  // --------------- 草稿自动保存 ---------------
+  const MEETING_DRAFT_KEY = 'tutor_draft_meeting';
+  useEffect(() => {
+    if (!mounted) return;
+    const draft = { meetingType, studentName, meetingId, meetingTime };
+    localStorage.setItem(MEETING_DRAFT_KEY, JSON.stringify(draft));
+  }, [mounted, meetingType, studentName, meetingId, meetingTime]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const raw = localStorage.getItem(MEETING_DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft.meetingType) setMeetingType(draft.meetingType);
+        if (draft.studentName) setStudentName(draft.studentName);
+        if (draft.meetingId) setMeetingId(draft.meetingId);
+        if (draft.meetingTime) setMeetingTime(draft.meetingTime);
+      }
+    } catch {}
+  }, [mounted]);
+
   // --------------- 生成消息 ---------------
 
   const handleGenerate = useCallback(() => {
@@ -140,6 +162,7 @@ export function MeetingReminder({ toast, onCopy }: Props) {
           setMeetingId('');
           setMeetingTime('');
           setMessage('');
+          localStorage.removeItem(MEETING_DRAFT_KEY);
         }}>
           清空
         </button>

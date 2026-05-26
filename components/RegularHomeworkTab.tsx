@@ -28,6 +28,29 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
   const [pdfSession, setPdfSession] = useState('');
   const [pdfFiles, setPdfFiles] = useState<{ name: string; size: number; error?: string }[]>([]);
 
+  // --------------- 草稿自动保存 ---------------
+  const HOMEWORK_DRAFT_KEY = 'tutor_draft_homework';
+  useEffect(() => {
+    if (!mounted) return;
+    const draft = { studentName, date, link1, link2, link3 };
+    localStorage.setItem(HOMEWORK_DRAFT_KEY, JSON.stringify(draft));
+  }, [mounted, studentName, date, link1, link2, link3]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const raw = localStorage.getItem(HOMEWORK_DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft.studentName) setStudentName(draft.studentName);
+        if (draft.date) setDate(draft.date);
+        if (draft.link1) setLink1(draft.link1);
+        if (draft.link2) setLink2(draft.link2);
+        if (draft.link3) setLink3(draft.link3);
+      }
+    } catch {}
+  }, [mounted]);
+
   // --------------- 格式化日期 ---------------
 
   const getFormattedDate = useCallback(() => {
@@ -249,6 +272,7 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
             setPdfError('');
             setPdfFiles([]);
             setPdfSession('');
+            localStorage.removeItem(HOMEWORK_DRAFT_KEY);
           }}>
             清空
           </button>

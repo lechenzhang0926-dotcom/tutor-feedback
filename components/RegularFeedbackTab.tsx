@@ -42,6 +42,28 @@ export function RegularFeedbackTab({ toast }: Props) {
     setRemaining(getRemainingToday());
   });
 
+  // --------------- 草稿自动保存 ---------------
+  const DRAFT_KEY = 'tutor_draft_feedback';
+  useEffect(() => {
+    if (!mounted) return;
+    const draft = { feedbackType, feedbackLength, notes, selectedStudentId };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }, [mounted, feedbackType, feedbackLength, notes, selectedStudentId]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (raw) {
+        const draft = JSON.parse(raw);
+        if (draft.feedbackType) setFeedbackType(draft.feedbackType);
+        if (draft.feedbackLength) setFeedbackLength(draft.feedbackLength);
+        if (draft.notes) setNotes(draft.notes);
+        if (draft.selectedStudentId) setSelectedStudentId(draft.selectedStudentId);
+      }
+    } catch {}
+  }, [mounted]);
+
   // --------------- 图片上传 ---------------
 
   const processFile = useCallback((file: File) => {
@@ -306,7 +328,7 @@ export function RegularFeedbackTab({ toast }: Props) {
           </button>
           <button
             className="btn btn-ghost"
-            onClick={() => { setNotes(''); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); }}
+            onClick={() => { setNotes(''); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); localStorage.removeItem(DRAFT_KEY); }}
           >
             清空
           </button>
