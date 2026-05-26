@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
   let browser;
   try {
     const { chromium } = await import('playwright');
-    browser = await chromium.launch({ headless: true });
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
     const context = await browser.newContext();
     const page = await context.newPage();
 

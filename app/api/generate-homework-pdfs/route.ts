@@ -83,7 +83,10 @@ export async function POST(request: NextRequest) {
     let browser;
     try {
       const { chromium } = await import('playwright');
-      browser = await chromium.launch({ headless: true });
+      browser = await chromium.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知错误';
       console.error('[generate-homework-pdfs] Playwright 启动失败:', msg);
