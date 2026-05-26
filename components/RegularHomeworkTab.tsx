@@ -10,12 +10,14 @@ interface Props {
 }
 
 export function RegularHomeworkTab({ toast, onCopy }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
   const [date, setDate] = useState('');
 
   useEffect(() => {
     setDate(beijingDateString());
+    setMounted(true);
   }, []);
   const [link1, setLink1] = useState('');
   const [link2, setLink2] = useState('');
@@ -160,8 +162,8 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
             }}
             style={{ width: '100%', padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
           >
-            <option value="">{getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
-            {getStudents().map((s) => (
+            <option value="">{!mounted ? '' : getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
+            {mounted && getStudents().map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>

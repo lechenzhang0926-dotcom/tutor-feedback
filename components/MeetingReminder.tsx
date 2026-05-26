@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getStudents, getStudentById } from '@/lib/storage';
 
 type MeetingType = 'regular' | 'anti-forgetting' | 'both';
@@ -11,9 +11,12 @@ interface Props {
 }
 
 export function MeetingReminder({ toast, onCopy }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>('regular');
   const [studentName, setStudentName] = useState('');
+
+  useEffect(() => { setMounted(true); }, []);
   const [meetingId, setMeetingId] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
   const [message, setMessage] = useState('');
@@ -87,8 +90,8 @@ export function MeetingReminder({ toast, onCopy }: Props) {
           }}
           style={{ width: '100%', padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
         >
-          <option value="">{getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
-          {getStudents().map((s) => (
+          <option value="">{!mounted ? '' : getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
+          {mounted && getStudents().map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>

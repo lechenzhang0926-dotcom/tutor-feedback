@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   isRateLimited,
   incrementDailyCount,
@@ -17,8 +17,11 @@ interface Props {
 }
 
 export function RegularFeedbackTab({ toast }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [image, setImage] = useState<File | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
   const [imagePreview, setImagePreview] = useState('');
   const [compressedImage, setCompressedImage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'regular' | 'anti-forgetting'>('regular');
@@ -237,7 +240,7 @@ export function RegularFeedbackTab({ toast }: Props) {
             }}
           >
             <option value="">不选择学生</option>
-            {getStudents().map((s) => (
+            {mounted && getStudents().map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
