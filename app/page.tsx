@@ -62,21 +62,21 @@ export default function HomePage() {
         ))}
       </div>
 
-      {activeTab === 'regular-feedback' && (
+      <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}>
         <RegularFeedbackTab toast={toast} />
-      )}
+      </div>
 
-      {activeTab === 'regular-homework' && (
+      <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}>
         <RegularHomeworkTab toast={toast} onCopy={handleCopy} />
-      )}
+      </div>
 
-      {activeTab === 'meeting' && (
+      <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}>
         <MeetingReminder toast={toast} onCopy={handleCopy} />
-      )}
+      </div>
 
-      {activeTab === 'students' && (
+      <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>
         <StudentProfilesTab toast={toast} />
-      )}
+      </div>
 
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
     </div>
