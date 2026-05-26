@@ -183,10 +183,16 @@ export const REGULAR_FEEDBACK_PROMPT = `你是一名中国补课老师。根据�
 像老师发微信。可以带"呢""哦""哈"。不要UI装饰。`;
 
 /** 组装正课反馈的用户消息 */
-export function buildRegularFeedbackMessage(structuredData: string): string {
+export function buildRegularFeedbackMessage(structuredData: string, length?: string): string {
+  let lengthHint = '';
+  if (length === 'short') {
+    lengthHint = '\n\n【反馈长度：简短版】只保留核心评价和课后建议，不要重点单词补充。总字数控制在 80-120 字。';
+  } else if (length === 'detailed') {
+    lengthHint = '\n\n【反馈长度：详细版】学后评价可以写 2-3 段，重点单词补充可以展开写，课后建议也可以详细些。总字数控制在 200-350 字。';
+  }
   return `以下是从上课报告中提取的结构化信息。请根据这些信息生成正课反馈，数据全部原样保留。
 
-${structuredData}`;
+${structuredData}${lengthHint}`;
 }
 
 /** 用于把 OCR 原始文字整理成结构化数据的 prompt */

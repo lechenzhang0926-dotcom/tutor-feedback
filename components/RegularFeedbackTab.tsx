@@ -22,6 +22,7 @@ export function RegularFeedbackTab({ toast }: Props) {
   const [imagePreview, setImagePreview] = useState('');
   const [compressedImage, setCompressedImage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'regular' | 'anti-forgetting'>('regular');
+  const [feedbackLength, setFeedbackLength] = useState<'short' | 'standard' | 'detailed'>('standard');
   const [notes, setNotes] = useState('');
   const [claudeResult, setClaudeResult] = useState('');
   const [feedback, setFeedback] = useState('');
@@ -133,6 +134,7 @@ export function RegularFeedbackTab({ toast }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           feedbackType,
+          feedbackLength,
           structuredData: claudeResult || undefined,
           notes: notes.trim() || undefined,
           studentProfile: student ? buildStudentContext(student) : undefined,
@@ -199,7 +201,7 @@ export function RegularFeedbackTab({ toast }: Props) {
       document.execCommand('copy');
       document.body.removeChild(ta);
     }
-    toast('已复制到剪贴板');
+    toast('已复制，可以直接发给家长');
   }, [feedback, toast]);
 
   // --------------- Render ---------------
@@ -239,6 +241,18 @@ export function RegularFeedbackTab({ toast }: Props) {
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
+        </div>
+
+        <div className="field">
+          <label>反馈长度</label>
+          <div className="radio-group">
+            <input type="radio" name="feedbackLength" id="fl_short" checked={feedbackLength === 'short'} onChange={() => setFeedbackLength('short')} />
+            <label htmlFor="fl_short">简短版</label>
+            <input type="radio" name="feedbackLength" id="fl_standard" checked={feedbackLength === 'standard'} onChange={() => setFeedbackLength('standard')} />
+            <label htmlFor="fl_standard">标准版</label>
+            <input type="radio" name="feedbackLength" id="fl_detailed" checked={feedbackLength === 'detailed'} onChange={() => setFeedbackLength('detailed')} />
+            <label htmlFor="fl_detailed">详细版</label>
+          </div>
         </div>
 
         <div className="field">

@@ -141,6 +141,12 @@ export function StudentProfilesTab({ toast }: Props) {
             </div>
           )}
 
+          {!s.textbook && (!s.commonWeakWords || s.commonWeakWords.length === 0) && (!s.commonIssues || s.commonIssues.length === 0) && (!s.strengths || s.strengths.length === 0) && (
+            <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: 6, fontStyle: 'italic' }}>
+              生成几次反馈后，这里会自动积累学习特点。
+            </div>
+          )}
+
           <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 8 }}>
             最近反馈：{s.recentFeedbacks.length} 条
           </div>

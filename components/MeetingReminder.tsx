@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { getStudents, getStudentById } from '@/lib/storage';
 
 type MeetingType = 'regular' | 'anti-forgetting' | 'both';
 
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function MeetingReminder({ toast, onCopy }: Props) {
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>('regular');
   const [studentName, setStudentName] = useState('');
   const [meetingId, setMeetingId] = useState('');
@@ -72,6 +74,24 @@ export function MeetingReminder({ toast, onCopy }: Props) {
           />
           <label htmlFor="mt_both">正课+抗遗忘</label>
         </div>
+      </div>
+
+      <div className="field">
+        <label>选择学生 <span className="hint">（选填，自动填入名字）</span></label>
+        <select
+          value={selectedStudentId}
+          onChange={(e) => {
+            setSelectedStudentId(e.target.value);
+            const s = getStudentById(e.target.value);
+            if (s) setStudentName(s.name);
+          }}
+          style={{ width: '100%', padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
+        >
+          <option value="">{getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
+          {getStudents().map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="field">

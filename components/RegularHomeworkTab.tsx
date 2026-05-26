@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { buildHomeworkMessage } from '@/lib/homeworkMessage';
+import { getStudents, getStudentById } from '@/lib/storage';
 
 interface Props {
   toast: (msg: string) => void;
@@ -9,6 +10,7 @@ interface Props {
 }
 
 export function RegularHomeworkTab({ toast, onCopy }: Props) {
+  const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
   const [date, setDate] = useState(() => beijingDateString());
   const [link1, setLink1] = useState('');
@@ -144,6 +146,24 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
         <div className="card-title">正课作业</div>
 
         <div className="field">
+          <label>选择学生 <span className="hint">（选填，自动填入名字）</span></label>
+          <select
+            value={selectedStudentId}
+            onChange={(e) => {
+              setSelectedStudentId(e.target.value);
+              const s = getStudentById(e.target.value);
+              if (s) setStudentName(s.name);
+            }}
+            style={{ width: '100%', padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
+          >
+            <option value="">{getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
+            {getStudents().map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="field">
           <label>学生名字</label>
           <input
             type="text"
@@ -157,16 +177,17 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
 
         <div className="field">
           <label>日期</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            style={{
-              padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)',
-              borderRadius: 8, background: 'var(--card)', color: 'var(--text)',
-              fontFamily: 'inherit',
-            }}
-          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              style={{ flex: 1, padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
+            />
+            <button className="btn btn-ghost" onClick={() => setDate(beijingDateString())} style={{ whiteSpace: 'nowrap' }}>
+              今天
+            </button>
+          </div>
         </div>
 
         <div className="field">
@@ -224,7 +245,7 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
           <div className="card-title">作业群消息</div>
           <div className="output-area">{homeworkMsg}</div>
           <div className="btn-row">
-            <button className="btn btn-primary" onClick={() => onCopy(homeworkMsg)}>
+            <button className="btn btn-primary" onClick={() => { onCopy(homeworkMsg); toast('已复制作业消息'); }}>
               复制作业消息
             </button>
           </div>

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { feedbackType, structuredData: incomingStructured, notes, studentProfile } = body;
+    const { feedbackType, feedbackLength, structuredData: incomingStructured, notes, studentProfile } = body;
 
     const hasStructured = incomingStructured && typeof incomingStructured === 'string' && incomingStructured.trim();
     const hasNotes = notes && typeof notes === 'string' && notes.trim();
@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     const prompt = isAntiForgetting ? ANTI_FORGETTING_PROMPT : REGULAR_FEEDBACK_PROMPT;
     const userMessage = isAntiForgetting
       ? buildAntiForgettingMessage(structuredData)
-      : buildRegularFeedbackMessage(structuredData);
+      : buildRegularFeedbackMessage(structuredData, feedbackLength);
 
     const feedback = await generateFeedback(prompt, userMessage, 0.82);
 
