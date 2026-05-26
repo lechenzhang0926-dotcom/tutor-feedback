@@ -130,6 +130,16 @@ export function MeetingReminder({ toast, onCopy }: Props) {
         <button className="btn btn-primary" onClick={handleGenerate}>
           生成消息
         </button>
+        <button className="btn btn-ghost" onClick={() => {
+          setSelectedStudentId('');
+          setMeetingType('regular');
+          setStudentName('');
+          setMeetingId('');
+          setMeetingTime('');
+          setMessage('');
+        }}>
+          清空
+        </button>
       </div>
 
       {message && (

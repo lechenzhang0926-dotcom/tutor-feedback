@@ -232,6 +232,20 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
           >
             {pdfLoading ? '正在生成 PDF...' : '生成 PDF'}
           </button>
+          <button className="btn btn-ghost" onClick={() => {
+            setSelectedStudentId('');
+            setStudentName('');
+            setDate(beijingDateString());
+            setLink1('');
+            setLink2('');
+            setLink3('');
+            setMsgGenerated(false);
+            setPdfError('');
+            setPdfFiles([]);
+            setPdfSession('');
+          }}>
+            清空
+          </button>
         </div>
 
         {pdfError && (
