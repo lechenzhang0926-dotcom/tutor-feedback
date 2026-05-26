@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { buildHomeworkMessage } from '@/lib/homeworkMessage';
 import { getStudents, getStudentById } from '@/lib/storage';
 
@@ -12,7 +12,11 @@ interface Props {
 export function RegularHomeworkTab({ toast, onCopy }: Props) {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
-  const [date, setDate] = useState(() => beijingDateString());
+  const [date, setDate] = useState('');
+
+  useEffect(() => {
+    setDate(beijingDateString());
+  }, []);
   const [link1, setLink1] = useState('');
   const [link2, setLink2] = useState('');
   const [link3, setLink3] = useState('');

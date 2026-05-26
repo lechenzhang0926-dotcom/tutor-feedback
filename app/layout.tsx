@@ -10,7 +10,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-CN">
       <body>
-        {/* 装饰元素 */}
         <div className="bg-decorations" aria-hidden="true">
           <div className="bg-blob bg-blob-1" />
           <div className="bg-blob bg-blob-2" />
