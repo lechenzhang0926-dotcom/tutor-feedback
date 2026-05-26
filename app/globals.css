@@ -496,6 +496,77 @@ body {
 }
 .form-row .field { flex: 1; min-width: 180px; }
 
+/* ====== Background Decorations ====== */
+.bg-decorations {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.bg-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.18;
+}
+
+.bg-blob-1 {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  right: -100px;
+  background: radial-gradient(circle, #e8c89e, transparent 70%);
+}
+
+.bg-blob-2 {
+  width: 300px;
+  height: 300px;
+  bottom: -60px;
+  left: -80px;
+  background: radial-gradient(circle, #d4a574, transparent 70%);
+}
+
+.bg-blob-3 {
+  width: 200px;
+  height: 200px;
+  top: 50%;
+  right: -40px;
+  background: radial-gradient(circle, #f0dbc4, transparent 70%);
+  opacity: 0.12;
+}
+
+/* subtle repeating dot pattern */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.25;
+  background-image: radial-gradient(circle, #c8b69a 0.5px, transparent 0.5px);
+  background-size: 32px 32px;
+}
+
+.container {
+  position: relative;
+  z-index: 1;
+}
+
+@media (prefers-color-scheme: dark) {
+  .bg-blob-1 { background: radial-gradient(circle, #4a3828, transparent 70%); opacity: 0.15; }
+  .bg-blob-2 { background: radial-gradient(circle, #3d2d1f, transparent 70%); opacity: 0.12; }
+  .bg-blob-3 { background: radial-gradient(circle, #4a3828, transparent 70%); opacity: 0.08; }
+  body::before { background-image: radial-gradient(circle, #5a4a3a 0.5px, transparent 0.5px); opacity: 0.18; }
+}
+
+@media (max-width: 640px) {
+  .bg-blob-1 { width: 200px; height: 200px; top: -60px; right: -60px; }
+  .bg-blob-2 { width: 150px; height: 150px; bottom: -30px; left: -40px; }
+  .bg-blob-3 { display: none; }
+}
+
 /* ====== Progressive Disclosure (hidden by default) ====== */
 @media (max-width: 640px) {
   .container { padding: 16px 12px 48px; }
