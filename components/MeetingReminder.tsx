@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { getStudents, getStudentById } from '@/lib/storage';
+import { incrementMeetingCount, recordStudentUsage } from '@/lib/dashboardUtils';
 
 type MeetingType = 'regular' | 'anti-forgetting' | 'both';
 
@@ -67,7 +68,9 @@ export function MeetingReminder({ toast, onCopy }: Props) {
     const msg = `⏰⏰下次${typeLabel}时间在${timeFormatted}，这是会议号#腾讯会议：${meetingId.trim()} 请${studentName.trim()}同学查收`;
 
     setMessage(msg);
-  }, [meetingType, studentName, meetingId, meetingTime, toast]);
+    incrementMeetingCount();
+    if (selectedStudentId) recordStudentUsage(selectedStudentId);
+  }, [meetingType, studentName, meetingId, meetingTime, selectedStudentId, toast]);
 
   // --------------- Render ---------------
 

@@ -4,14 +4,16 @@ import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { AuthForm } from '@/components/AuthForm';
 import { UserMenu } from '@/components/UserMenu';
+import { DashboardTab } from '@/components/DashboardTab';
 import { RegularFeedbackTab } from '@/components/RegularFeedbackTab';
 import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
 import { StudentProfilesTab } from '@/components/StudentProfilesTab';
 
-type TabId = 'regular-feedback' | 'regular-homework' | 'meeting' | 'students';
+type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'meeting' | 'students';
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'dashboard', label: 'Dashboard' },
   { id: 'regular-feedback', label: '课后反馈' },
   { id: 'regular-homework', label: '正课作业' },
   { id: 'meeting', label: '会议提醒' },
@@ -19,12 +21,11 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 export default function HomePage() {
-  const [activeTab, setActiveTab] = useState<TabId>('regular-feedback');
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [toastMsg, setToastMsg] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // 检查登录状态
   useEffect(() => {
     const check = async () => {
       try {
@@ -68,7 +69,6 @@ export default function HomePage() {
     [toast]
   );
 
-  // 未检查完登录状态时显示加载
   if (!authChecked) {
     return (
       <div className="auth-page">
@@ -82,12 +82,10 @@ export default function HomePage() {
     );
   }
 
-  // 未登录显示登录/注册界面
   if (!userEmail) {
     return <AuthForm onLogin={() => {}} />;
   }
 
-  // 已登录显示主工具页面
   return (
     <div className="container">
       <UserMenu email={userEmail} onLogout={() => setUserEmail(null)} />
@@ -107,6 +105,14 @@ export default function HomePage() {
             {tab.label}
           </button>
         ))}
+      </div>
+
+      <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
+        <DashboardTab
+          onNavigate={(tab) => setActiveTab(tab as TabId)}
+          onSelectStudent={() => {}}
+          onCopy={handleCopy}
+        />
       </div>
 
       <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}>
