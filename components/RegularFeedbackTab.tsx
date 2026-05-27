@@ -590,6 +590,7 @@ function DropZone({
   onOcr,
   ocrLoading,
   fileInputRef,
+  toast,
 }: {
   onFileDrop: (file: File) => void;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
