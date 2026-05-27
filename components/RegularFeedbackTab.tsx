@@ -420,7 +420,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
                   <button
                     key={phrase}
                     onClick={() => togglePhrase(phrase)}
-                    onDoubleClick={() => { deleteCustomPhrase(phrase); setCustomPhrases(getCustomFeedbackPhrases()); setSelectedPhrases((prev) => prev.filter((p) => p !== phrase)); }}
+                    onDoubleClick={() => handleDeleteCustom(phrase)}
                     style={{
                       fontSize: '.78rem',
                       padding: '4px 12px',
