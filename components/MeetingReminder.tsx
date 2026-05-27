@@ -63,6 +63,11 @@ export function MeetingReminder({ toast, onCopy }: Props) {
       toast('请输入学生名字');
       return;
     }
+    const cleaned = parseMeetingId(meetingId);
+    if (!cleaned) {
+      toast('无法识别会议号，请检查输入');
+      return;
+    }
     if (!meetingTime.trim()) {
       toast('请查询或输入会议时间');
       return;
@@ -77,7 +82,7 @@ export function MeetingReminder({ toast, onCopy }: Props) {
 
     const timeFormatted = formatRelativeTime(meetingTime.trim());
 
-    const msg = `⏰⏰下次${typeLabel}时间在${timeFormatted}，这是会议号#腾讯会议：${meetingId.trim()} 请${studentName.trim()}同学查收`;
+    const msg = `⏰⏰下次${typeLabel}时间在${timeFormatted}，这是会议号#腾讯会议：${cleaned} 请${studentName.trim()}同学查收`;
 
     setMessage(msg);
     incrementMeetingCount();
@@ -206,6 +211,35 @@ export function MeetingReminder({ toast, onCopy }: Props) {
       )}
     </div>
   );
+}
+
+/** 从用户输入中提取并格式化会议号 */
+function parseMeetingId(input: string): string {
+  const trimmed = input.trim();
+  if (!trimmed) return '';
+
+  // 提取数字 + 横杠：支持 "793-508-153" 或 "793508153"
+  const numMatch = trimmed.match(/(\d[\d-]*\d)/);
+  if (!numMatch) return '';
+
+  let digits = numMatch[1].replace(/-/g, '');
+  if (digits.length < 9) return '';
+  if (digits.length > 12) return '';
+
+  // 格式化为 XXX-XXX-XXX
+  if (digits.length === 9) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}`;
+  }
+  if (digits.length === 10) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  }
+  if (digits.length === 11) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7, 11)}`;
+  }
+  if (digits.length === 12) {
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 9)}-${digits.slice(9, 12)}`;
+  }
+  return '';
 }
 
 /** 把会议时间格式化为相对表达，如"明天的晚上7点45" */
