@@ -24,37 +24,19 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [toastMsg, setToastMsg] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
   const [pendingStudentId, setPendingStudentId] = useState('');
 
   useEffect(() => {
-    let cancelled = false;
-    // 5 秒超时防止卡住
-    const timeout = setTimeout(() => {
-      if (!cancelled) setAuthChecked(true);
-    }, 5000);
-
-    const check = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!cancelled) setUserEmail(session?.user?.email || null);
-      } catch {
-        if (!cancelled) setUserEmail(null);
-      }
-      if (!cancelled) setAuthChecked(true);
-      clearTimeout(timeout);
-    };
-    check();
+    // 后台检查是否已登录，不阻塞 UI
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email || null);
+    }).catch(() => {});
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email || null);
     });
 
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const toast = useCallback((msg: string) => {
@@ -81,21 +63,12 @@ export default function HomePage() {
     [toast]
   );
 
-  if (!authChecked) {
-    return (
-      <div className="auth-page">
-        <div className="auth-card">
-          <div className="auth-header">
-            <h1>Tutor 课后反馈生成器</h1>
-            <p>正在加载...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (!userEmail) {
-    return <AuthForm onLogin={() => {}} />;
+    return <AuthForm onLogin={() => {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        setUserEmail(session?.user?.email || null);
+      });
+    }} />;
   }
 
   return (
