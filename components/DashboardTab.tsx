@@ -71,7 +71,7 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
               >
                 {s.name}
                 {selectValue === s.id && (
-                  <span onClick={(e) => { e.stopPropagation(); setSelectedId(''); }} style={{ marginLeft: 4, cursor: 'pointer', opacity: .6 }}>×</span>
+                  <span onClick={(e) => { e.stopPropagation(); setSelectValue(''); }} style={{ marginLeft: 4, cursor: 'pointer', opacity: .6 }}>×</span>
                 )}
               </button>
             ))}
