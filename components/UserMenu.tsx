@@ -15,21 +15,13 @@ export function UserMenu({ email, onLogout }: Props) {
   }, [onLogout]);
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12,
-      padding: '10px 0 0', fontSize: '.78rem', color: 'var(--muted)',
-    }}>
-      <span>{email}</span>
-      <button
-        onClick={handleLogout}
-        style={{
-          background: 'none', border: '1px solid var(--border)', borderRadius: 6,
-          padding: '3px 12px', cursor: 'pointer', fontSize: '.78rem',
-          color: 'var(--muted)', fontFamily: 'inherit',
-        }}
-      >
-        退出登录
-      </button>
+    <div className="top-bar">
+      <div className="top-bar-user">
+        <span>{email}</span>
+        <button className="top-bar-logout" onClick={handleLogout}>
+          退出登录
+        </button>
+      </div>
     </div>
   );
 }

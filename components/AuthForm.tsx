@@ -31,8 +31,6 @@ export function AuthForm({ onLogin }: Props) {
           password: password.trim(),
         });
         if (signUpError) throw signUpError;
-        setError('');
-        // 注册成功后自动登录
         onLogin();
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
@@ -41,7 +39,6 @@ export function AuthForm({ onLogin }: Props) {
         });
         if (signInError) throw signInError;
 
-        // 不保持登录：监听页面关闭时登出
         if (!keepLoggedIn) {
           window.addEventListener('beforeunload', () => {
             supabase.auth.signOut();
@@ -65,67 +62,58 @@ export function AuthForm({ onLogin }: Props) {
   }, [email, password, isRegister, keepLoggedIn, onLogin]);
 
   return (
-    <div className="container" style={{ maxWidth: 420, paddingTop: 60 }}>
-      <div className="header">
-        <h1>Tutor 课后反馈生成器</h1>
-        <div className="sub">把课堂随记变成自然、得体的家长反馈</div>
-      </div>
-
-      <div className="card" style={{ marginTop: 32 }}>
-        <div className="card-title">{isRegister ? '注册账号' : '登录'}</div>
-
-        <div className="field">
-          <label>邮箱</label>
-          <input
-            type="email"
-            value={email}
-            onChange={(e) => { setEmail(e.target.value); setError(''); }}
-            placeholder="your@email.com"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-          />
+    <div className="auth-page">
+      <div className="auth-card">
+        <div className="auth-header">
+          <h1>Tutor 课后反馈生成器</h1>
+          <p>登录后开始生成课堂反馈和作业提醒</p>
         </div>
 
-        <div className="field">
-          <label>密码</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => { setPassword(e.target.value); setError(''); }}
-            placeholder="至少 6 位"
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
-          />
-        </div>
+        <div className="auth-body">
+          <div className="field">
+            <label>邮箱</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setError(''); }}
+              placeholder="your@email.com"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+            />
+          </div>
 
-        <div className="field">
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: '.84rem', fontWeight: 400 }}>
+          <div className="field">
+            <label>密码</label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setError(''); }}
+              placeholder="至少 6 位"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+            />
+          </div>
+
+          <label className="auth-checkbox">
             <input
               type="checkbox"
               checked={keepLoggedIn}
               onChange={(e) => setKeepLoggedIn(e.target.checked)}
-              style={{ width: 16, height: 16, cursor: 'pointer' }}
             />
-            下次自动登录
+            <span>下次自动登录</span>
           </label>
-        </div>
 
-        {error && (
-          <div style={{ color: 'var(--danger)', fontSize: '.84rem', marginBottom: 12 }}>{error}</div>
-        )}
+          {error && <div className="auth-error">{error}</div>}
 
-        <div className="btn-row">
-          <button
-            className="btn btn-primary"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? '处理中...' : isRegister ? '注册' : '登录'}
-          </button>
-          <button
-            className="btn btn-ghost"
-            onClick={() => { setIsRegister(!isRegister); setError(''); }}
-          >
-            {isRegister ? '已有账号？登录' : '没有账号？注册'}
-          </button>
+          <div className="auth-buttons">
+            <button className="btn btn-primary" onClick={handleSubmit} disabled={loading}>
+              {loading ? '处理中...' : isRegister ? '注册' : '登录'}
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => { setIsRegister(!isRegister); setError(''); }}
+            >
+              {isRegister ? '已有账号？去登录' : '没有账号？注册'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
