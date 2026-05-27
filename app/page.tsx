@@ -28,14 +28,21 @@ export default function HomePage() {
   const [pendingStudentId, setPendingStudentId] = useState('');
 
   useEffect(() => {
+    let cancelled = false;
+    // 5 秒超时防止卡住
+    const timeout = setTimeout(() => {
+      if (!cancelled) setAuthChecked(true);
+    }, 5000);
+
     const check = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setUserEmail(session?.user?.email || null);
+        if (!cancelled) setUserEmail(session?.user?.email || null);
       } catch {
-        setUserEmail(null);
+        if (!cancelled) setUserEmail(null);
       }
-      setAuthChecked(true);
+      if (!cancelled) setAuthChecked(true);
+      clearTimeout(timeout);
     };
     check();
 
@@ -43,7 +50,11 @@ export default function HomePage() {
       setUserEmail(session?.user?.email || null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const toast = useCallback((msg: string) => {

@@ -166,7 +166,7 @@ export function MeetingReminder({ toast, onCopy }: Props) {
         <label>腾讯会议号</label>
         <input
           type="text"
-          placeholder="793-508-153"
+          placeholder="#腾讯会议：793-508-153"
           value={meetingId}
           onChange={(e) => setMeetingId(e.target.value)}
         />
