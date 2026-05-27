@@ -26,10 +26,13 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
 
   const handleSelect = (id: string) => {
     if (!id) return;
-    setSelectValue(id);
+    const s = getStudentById(id);
+    if (!s) return;
     onSelectStudent(id);
     recordStudentUsage(id);
     setSelectedTags((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    // 重置下拉框，以便可以再次选择同一个学生
+    setSelectValue('');
   };
 
   const removeTag = (id: string) => {
@@ -37,8 +40,8 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
   };
 
   const handleAction = (tab: string) => {
-    // 优先用最后一个已选标签，否则用下拉框当前值
-    const activeId = selectedTags.length > 0 ? selectedTags[selectedTags.length - 1] : selectValue;
+    // 使用最后一个已选标签
+    const activeId = selectedTags.length > 0 ? selectedTags[selectedTags.length - 1] : '';
     if (activeId) onSelectStudent(activeId);
     onNavigate(tab);
   };
@@ -61,7 +64,7 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
             onChange={(e) => handleSelect(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', fontSize: '.9rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
           >
-            <option value="">选择学生（可选）</option>
+            <option value="">请选择学生</option>
             {students.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
