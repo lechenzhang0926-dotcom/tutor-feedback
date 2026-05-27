@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { getStudents, getStudentById } from '@/lib/storage';
+import { getStudents, getStudentById, saveStudent } from '@/lib/storage';
 import { incrementMeetingCount, incrementTotalMeetingCount, recordStudentUsage } from '@/lib/dashboardUtils';
+import type { StudentProfile } from '@/lib/types';
 
 type MeetingType = 'regular' | 'anti-forgetting' | 'both';
 
@@ -16,8 +17,19 @@ export function MeetingReminder({ toast, onCopy }: Props) {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>('regular');
   const [studentName, setStudentName] = useState('');
+  const [showTempName, setShowTempName] = useState(false);
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
 
   useEffect(() => { setMounted(true); }, []);
+
+  const handleAddStudent = () => {
+    if (!newStudentName.trim()) return;
+    const now = new Date().toISOString();
+    const s: StudentProfile = { id: Date.now().toString(), name: newStudentName.trim(), recentFeedbacks: [], createdAt: now, updatedAt: now };
+    saveStudent(s); setSelectedStudentId(s.id); setStudentName(s.name); setShowTempName(false); setAddingStudent(false); setNewStudentName(''); toast('已添加并选中');
+  };
+
   const [meetingId, setMeetingId] = useState('');
   const [meetingTime, setMeetingTime] = useState('');
   const [message, setMessage] = useState('');
@@ -106,35 +118,44 @@ export function MeetingReminder({ toast, onCopy }: Props) {
       </div>
 
       <div className="field">
-        <label>选择学生 <span className="hint">（选填，自动填入名字）</span></label>
-        <select
-          value={selectedStudentId}
-          onChange={(e) => {
-            setSelectedStudentId(e.target.value);
-            const s = getStudentById(e.target.value);
-            if (s) setStudentName(s.name);
-          }}
-          style={{ width: '100%', padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
-        >
-          <option value="">{!mounted ? '' : getStudents().length === 0 ? '暂无学生，请先在学生档案中新增' : '手动输入名字'}</option>
-          {mounted && getStudents().map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <div style={{ fontSize: '.74rem', color: 'var(--muted)', marginTop: 4 }}>选择学生后会自动填入名字，也可以手动修改。</div>
-      </div>
+        <label>选择学生</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <select
+            value={selectedStudentId}
+            onChange={(e) => {
+              const v = e.target.value;
+              setSelectedStudentId(v);
+              if (v === '__temp__') { setShowTempName(true); setStudentName(''); }
+              else { setShowTempName(false); const s = getStudentById(v); if (s) setStudentName(s.name); }
+            }}
+            style={{ flex: 1, padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
+          >
+            <option value="">不选择学生</option>
+            {mounted && getStudents().map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+            <option value="__temp__">手动输入名字</option>
+          </select>
+          <button className="btn btn-ghost" onClick={() => setAddingStudent(true)} style={{ whiteSpace: 'nowrap' }}>新增学生</button>
+        </div>
+        </div>
 
-      <div className="field">
-        <label>学生名字</label>
-        <input
-          type="text"
-          className="small"
-          placeholder="如：周妍"
-          maxLength={20}
-          value={studentName}
-          onChange={(e) => setStudentName(e.target.value)}
-        />
-      </div>
+      {addingStudent && (
+        <div className="field" style={{ padding: '10px 14px', background: 'var(--tag-bg)', borderRadius: 8 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input type="text" placeholder="输入学生名字" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAddStudent(); }} style={{ flex: 1 }} />
+            <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAddStudent}>保存</button>
+            <button className="btn btn-ghost" onClick={() => { setAddingStudent(false); setNewStudentName(''); }}>取消</button>
+          </div>
+        </div>
+      )}
+
+      {showTempName && (
+        <div className="field">
+          <label>学生名字</label>
+          <input type="text" className="small" placeholder="如：周妍" maxLength={20} value={studentName} onChange={(e) => setStudentName(e.target.value)} />
+        </div>
+      )}
 
       <div className="field">
         <label>腾讯会议号</label>

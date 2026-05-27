@@ -27,10 +27,20 @@ interface Props {
 export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
   const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [newStudentName, setNewStudentName] = useState('');
   const [image, setImage] = useState<File | null>(null);
 
   useEffect(() => { setMounted(true); setCustomPhrases(getCustomFeedbackPhrases()); }, []);
   useEffect(() => { if (preSelectStudentId) setSelectedStudentId(preSelectStudentId); }, [preSelectStudentId]);
+
+  const handleAddStudent = () => {
+    if (!newStudentName.trim()) return;
+    const now = new Date().toISOString();
+    const s: StudentProfile = { id: Date.now().toString(), name: newStudentName.trim(), recentFeedbacks: [], createdAt: now, updatedAt: now };
+    saveStudent(s); setSelectedStudentId(s.id); setAddingStudent(false); setNewStudentName(''); toast('已添加并选中');
+  };
+
   const [imagePreview, setImagePreview] = useState('');
   const [compressedImage, setCompressedImage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'regular' | 'anti-forgetting'>('regular');
@@ -296,22 +306,30 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
 
         <div className="field">
           <label>选择学生 <span className="hint">（选填，选中后反馈会自动归档）</span></label>
-          <select
-            value={selectedStudentId}
-            onChange={(e) => setSelectedStudentId(e.target.value)}
-            style={{
-              width: '100%', padding: '8px 12px', fontSize: '.88rem',
-              border: '1px solid var(--border)', borderRadius: 8,
-              background: 'var(--card)', color: 'var(--text)',
-              fontFamily: 'inherit',
-            }}
-          >
-            <option value="">不选择学生</option>
-            {mounted && getStudents().map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              value={selectedStudentId}
+              onChange={(e) => setSelectedStudentId(e.target.value)}
+              style={{ flex: 1, padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
+            >
+              <option value="">不选择学生</option>
+              {mounted && getStudents().map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <button className="btn btn-ghost" onClick={() => setAddingStudent(true)} style={{ whiteSpace: 'nowrap' }}>新增学生</button>
+          </div>
         </div>
+
+        {addingStudent && (
+          <div style={{ padding: '10px 14px', marginBottom: 14, background: 'var(--tag-bg)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input type="text" placeholder="输入学生名字" value={newStudentName} onChange={(e) => setNewStudentName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleAddStudent(); }} style={{ flex: 1 }} />
+              <button className="btn btn-primary" style={{ whiteSpace: 'nowrap' }} onClick={handleAddStudent}>保存</button>
+              <button className="btn btn-ghost" onClick={() => { setAddingStudent(false); setNewStudentName(''); }}>取消</button>
+            </div>
+          </div>
+        )}
 
         <div className="field">
           <label>反馈长度</label>
