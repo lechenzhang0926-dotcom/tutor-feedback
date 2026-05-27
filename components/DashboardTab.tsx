@@ -70,6 +70,9 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
                 style={selectedId === s.id ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-light)' } : {}}
               >
                 {s.name}
+                {selectedId === s.id && (
+                  <span onClick={(e) => { e.stopPropagation(); setSelectedId(''); onSelectStudent(''); }} style={{ marginLeft: 4, cursor: 'pointer', opacity: .6 }}>×</span>
+                )}
               </button>
             ))}
           </div>

@@ -594,7 +594,7 @@ body {
 /* ====== Top Bar (user menu) ====== */
 .top-bar {
   position: absolute;
-  top: 6px;
+  top: 16px;
   right: 24px;
   z-index: 10;
 }

@@ -131,11 +131,11 @@ export default function HomePage() {
       </div>
 
       <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}>
-        <RegularHomeworkTab toast={toast} onCopy={handleCopy} />
+        <RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} />
       </div>
 
       <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}>
-        <MeetingReminder toast={toast} onCopy={handleCopy} />
+        <MeetingReminder toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} />
       </div>
 
       <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>

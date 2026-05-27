@@ -10,9 +10,10 @@ type MeetingType = 'regular' | 'anti-forgetting' | 'both';
 interface Props {
   toast: (msg: string) => void;
   onCopy: (text: string) => void;
+  preSelectStudentId?: string;
 }
 
-export function MeetingReminder({ toast, onCopy }: Props) {
+export function MeetingReminder({ toast, onCopy, preSelectStudentId }: Props) {
   const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [meetingType, setMeetingType] = useState<MeetingType>('regular');
@@ -22,6 +23,14 @@ export function MeetingReminder({ toast, onCopy }: Props) {
   const [newStudentName, setNewStudentName] = useState('');
 
   useEffect(() => { setMounted(true); }, []);
+
+  useEffect(() => {
+    if (preSelectStudentId) {
+      setSelectedStudentId(preSelectStudentId);
+      const s = getStudentById(preSelectStudentId);
+      if (s) setStudentName(s.name);
+    }
+  }, [preSelectStudentId]);
 
   const handleAddStudent = () => {
     if (!newStudentName.trim()) return;
