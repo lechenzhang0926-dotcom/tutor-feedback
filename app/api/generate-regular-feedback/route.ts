@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
-    const { feedbackType, feedbackLength, structuredData: incomingStructured, notes, studentProfile } = body;
+    const { feedbackType, feedbackLength, structuredData: incomingStructured, notes, studentProfile, selectedPhrases } = body;
 
     const hasStructured = incomingStructured && typeof incomingStructured === 'string' && incomingStructured.trim();
     const hasNotes = notes && typeof notes === 'string' && notes.trim();
@@ -39,7 +39,12 @@ export async function POST(request: NextRequest) {
       combined = notes!.trim();
     }
 
-    if (combined.length > 5000) {
+    // 如果有选中的反馈短语标签，追加到提示中
+    if (selectedPhrases && Array.isArray(selectedPhrases) && selectedPhrases.length > 0) {
+      combined += `\n\n本节课需关注的问题/亮点（自然融入反馈，禁止机械罗列）：${selectedPhrases.join('、')}`;
+    }
+
+    if (combined.length > 5000){
       return NextResponse.json({ error: '内容过长，请缩短至 5000 字以内' }, { status: 400 });
     }
 

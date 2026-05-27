@@ -11,6 +11,12 @@ import {
 } from '@/lib/storage';
 import { updateProfileFromFeedback } from '@/lib/studentProfileUtils';
 import type { StudentProfile, FeedbackRecord } from '@/lib/types';
+import {
+  getDefaultFeedbackPhrases,
+  getCustomFeedbackPhrases,
+  deleteCustomPhrase,
+  updateCustomPhrasesFromUsage,
+} from '@/lib/feedbackPhraseUtils';
 
 interface Props {
   toast: (msg: string) => void;
@@ -21,7 +27,7 @@ export function RegularFeedbackTab({ toast }: Props) {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [image, setImage] = useState<File | null>(null);
 
-  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => { setMounted(true); setCustomPhrases(getCustomFeedbackPhrases()); }, []);
   const [imagePreview, setImagePreview] = useState('');
   const [compressedImage, setCompressedImage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'regular' | 'anti-forgetting'>('regular');
@@ -33,6 +39,8 @@ export function RegularFeedbackTab({ toast }: Props) {
   const feedback = feedbackVersions[currentVersion] || '';
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
+  const [selectedPhrases, setSelectedPhrases] = useState<string[]>([]);
+  const [customPhrases, setCustomPhrases] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [remaining, setRemaining] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,6 +109,25 @@ export function RegularFeedbackTab({ toast }: Props) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
+  // --------------- 短语标签 ---------------
+
+  const togglePhrase = useCallback((phrase: string) => {
+    setSelectedPhrases((prev) => {
+      if (prev.includes(phrase)) {
+        return prev.filter((p) => p !== phrase);
+      }
+      return [...prev, phrase];
+    });
+  }, []);
+
+  const handleDeleteCustom = useCallback((phrase: string) => {
+    deleteCustomPhrase(phrase);
+    setCustomPhrases(getCustomFeedbackPhrases());
+    setSelectedPhrases((prev) => prev.filter((p) => p !== phrase));
+  }, []);
+
+  const defaultPhrases = getDefaultFeedbackPhrases();
+
   // --------------- OCR 识别 ---------------
 
   const handleOcr = useCallback(async () => {
@@ -163,6 +190,7 @@ export function RegularFeedbackTab({ toast }: Props) {
           feedbackLength,
           structuredData: claudeResult || undefined,
           notes: notes.trim() || undefined,
+          selectedPhrases: selectedPhrases.length > 0 ? selectedPhrases : undefined,
           studentProfile: student ? buildStudentContext(student) : undefined,
         }),
       });
@@ -181,6 +209,12 @@ export function RegularFeedbackTab({ toast }: Props) {
       });
       setCurrentVersion(0);
       incrementDailyCount();
+
+      // 更新个性化短语
+      if (selectedPhrases.length > 0 || notes.trim()) {
+        const updated = updateCustomPhrasesFromUsage(notes.trim(), selectedPhrases);
+        setCustomPhrases(updated);
+      }
       setRemaining(getRemainingToday());
 
       // 保存到学生反馈历史 + 自动积累档案
@@ -306,6 +340,70 @@ export function RegularFeedbackTab({ toast }: Props) {
           </div>
         )}
 
+        {/* 常用反馈短语标签 */}
+        <div className="field">
+          <label>常用反馈短语</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {defaultPhrases.map((phrase) => {
+              const active = selectedPhrases.includes(phrase);
+              return (
+                <button
+                  key={phrase}
+                  onClick={() => togglePhrase(phrase)}
+                  className={`phrase-tag${active ? ' active' : ''}`}
+                  style={{
+                    fontSize: '.78rem',
+                    padding: '4px 12px',
+                    borderRadius: 16,
+                    border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: active ? 'var(--accent)' : 'var(--card)',
+                    color: active ? '#fff' : 'var(--muted)',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    transition: 'all .15s',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {phrase}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {customPhrases.length > 0 && (
+          <div className="field">
+            <label>个性化短语 <span className="hint">（自动积累，点击标签可删除）</span></label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {customPhrases.map((phrase) => {
+                const active = selectedPhrases.includes(phrase);
+                return (
+                  <button
+                    key={phrase}
+                    onClick={() => togglePhrase(phrase)}
+                    onDoubleClick={() => handleDeleteCustom(phrase)}
+                    title="双击删除此标签"
+                    style={{
+                      fontSize: '.78rem',
+                      padding: '4px 12px',
+                      borderRadius: 16,
+                      border: active ? '1px solid var(--accent)' : '1px dashed var(--border)',
+                      background: active ? 'var(--accent)' : 'var(--card)',
+                      color: active ? '#fff' : 'var(--muted)',
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      transition: 'all .15s',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {phrase}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <div className="field">
           <label>
             课后补充说明 <span className="hint">（选填，比如需要重点关注的单词等）</span>
@@ -328,7 +426,7 @@ export function RegularFeedbackTab({ toast }: Props) {
           </button>
           <button
             className="btn btn-ghost"
-            onClick={() => { setNotes(''); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); localStorage.removeItem(DRAFT_KEY); }}
+            onClick={() => { setNotes(''); setSelectedPhrases([]); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); localStorage.removeItem(DRAFT_KEY); }}
           >
             清空
           </button>
