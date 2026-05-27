@@ -109,6 +109,7 @@ export default function HomePage() {
 
       <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
         <DashboardTab
+          userEmail={userEmail ?? undefined}
           onNavigate={(tab) => setActiveTab(tab as TabId)}
           onSelectStudent={() => {}}
           onCopy={handleCopy}
