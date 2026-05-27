@@ -11,7 +11,9 @@ interface Props {
 }
 
 export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
+  const [addedStudents, setAddedStudents] = useState<string[]>([]);
   const [activeStudentId, setActiveStudentId] = useState('');
+  const [selectValue, setSelectValue] = useState('');
   const students = getStudents();
   const totalStats = getTotalStats();
   const recentIds = getRecentStudentIds();
@@ -25,9 +27,20 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
 
   const handleSelect = (id: string) => {
     if (!id) return;
+    recordStudentUsage(id);
+    setAddedStudents((prev) => (prev.includes(id) ? prev : [...prev, id]));
+    setActiveStudentId(id);
+    setSelectValue('');
+  };
+
+  const handleTagClick = (id: string) => {
     setActiveStudentId(id);
     onSelectStudent(id);
-    recordStudentUsage(id);
+  };
+
+  const handleRemoveTag = (id: string) => {
+    setAddedStudents((prev) => prev.filter((t) => t !== id));
+    setActiveStudentId((prev) => (prev === id ? '' : prev));
   };
 
   const handleAction = (tab: string) => {
@@ -49,7 +62,7 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
         {/* 选择学生 */}
         <div className="field" style={{ marginBottom: 12 }}>
           <select
-            value={activeStudentId}
+            value={selectValue}
             onChange={(e) => handleSelect(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', fontSize: '.9rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
           >
@@ -60,25 +73,35 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
           </select>
         </div>
 
-        {/* 最近学生快捷按钮 */}
-        {recentStudents.length > 0 && (
+        {/* 已添加学生标签 */}
+        {addedStudents.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-            {recentStudents.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => handleSelect(s.id)}
-                style={{
-                  fontSize: '.84rem', padding: '6px 14px', borderRadius: 16,
-                  border: activeStudentId === s.id ? '1px solid var(--accent)' : '1px solid var(--border)',
-                  background: activeStudentId === s.id ? 'var(--accent-light)' : 'var(--card)',
-                  color: activeStudentId === s.id ? 'var(--accent)' : 'var(--muted)',
-                  cursor: 'pointer', fontFamily: 'inherit', fontWeight: activeStudentId === s.id ? 600 : 400,
-                  transition: 'all .15s',
-                }}
-              >
-                {s.name}
-              </button>
-            ))}
+            {addedStudents.map((id) => {
+              const s = getStudentById(id);
+              if (!s) return null;
+              const active = id === activeStudentId;
+              return (
+                <span
+                  key={id}
+                  onClick={() => handleTagClick(id)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '5px 8px 5px 14px', borderRadius: 16,
+                    border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
+                    background: active ? 'var(--accent-light)' : 'var(--card)',
+                    color: active ? 'var(--accent)' : 'var(--muted)',
+                    fontSize: '.84rem', fontWeight: active ? 600 : 400,
+                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all .15s',
+                  }}
+                >
+                  {s.name}
+                  <span
+                    onClick={(e) => { e.stopPropagation(); handleRemoveTag(id); }}
+                    style={{ cursor: 'pointer', opacity: .35, fontSize: '.9rem', lineHeight: 1, padding: '0 4px' }}
+                  >×</span>
+                </span>
+              );
+            })}
           </div>
         )}
 
