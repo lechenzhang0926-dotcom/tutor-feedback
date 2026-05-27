@@ -23,20 +23,22 @@ const TABS: { id: TabId; label: string }[] = [
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [toastMsg, setToastMsg] = useState('');
-  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null | 'loading'>('loading');
   const [pendingStudentId, setPendingStudentId] = useState('');
 
   useEffect(() => {
-    // 后台检查是否已登录，不阻塞 UI
+    let cancelled = false;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserEmail(session?.user?.email || null);
-    }).catch(() => {});
+      if (!cancelled) setUserEmail(session?.user?.email || null);
+    }).catch(() => {
+      if (!cancelled) setUserEmail(null);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email || null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => { cancelled = true; subscription.unsubscribe(); };
   }, []);
 
   const toast = useCallback((msg: string) => {
@@ -63,11 +65,26 @@ export default function HomePage() {
     [toast]
   );
 
+  if (userEmail === 'loading') {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-header">
+            <h1>Tutor 课后反馈生成器</h1>
+          </div>
+          <div className="auth-body" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.88rem' }}>
+            检查登录状态...
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!userEmail) {
     return <AuthForm onLogin={() => {
       supabase.auth.getSession().then(({ data: { session } }) => {
         setUserEmail(session?.user?.email || null);
-      });
+      }).catch(() => {});
     }} />;
   }
 
