@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Tutor 课后反馈生成器',
   description: '把课堂随记变成自然、得体的家长反馈',

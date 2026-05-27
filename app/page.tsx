@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { supabase } from '@/lib/supabaseClient';
+import { AuthForm } from '@/components/AuthForm';
+import { UserMenu } from '@/components/UserMenu';
 import { RegularFeedbackTab } from '@/components/RegularFeedbackTab';
 import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
@@ -18,6 +21,23 @@ const TABS: { id: TabId; label: string }[] = [
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>('regular-feedback');
   const [toastMsg, setToastMsg] = useState('');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+
+  // 检查登录状态
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUserEmail(session?.user?.email || null);
+      setAuthChecked(true);
+    });
+
+    // 监听登录状态变化
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUserEmail(session?.user?.email || null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -43,8 +63,19 @@ export default function HomePage() {
     [toast]
   );
 
+  // 未检查完登录状态时不显示
+  if (!authChecked) return null;
+
+  // 未登录显示登录/注册界面
+  if (!userEmail) {
+    return <AuthForm onLogin={() => {}} />;
+  }
+
+  // 已登录显示主工具页面
   return (
     <div className="container">
+      <UserMenu email={userEmail} onLogout={() => setUserEmail(null)} />
+
       <div className="header">
         <h1>Tutor 课后反馈生成器</h1>
         <div className="sub">把课堂随记变成自然、得体的家长反馈</div>
