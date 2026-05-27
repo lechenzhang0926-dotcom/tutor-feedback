@@ -10,6 +10,7 @@ import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
 import { StudentProfilesTab } from '@/components/StudentProfilesTab';
 import { ImportAssistantTab } from '@/components/ImportAssistantTab';
+import { EnglishSystemGuide } from '@/components/EnglishSystemGuide';
 
 type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'meeting' | 'students' | 'import';
 
@@ -33,22 +34,14 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
-
-    // 3 秒后如果 Supabase 没响应，直接放行到登录页
     const timeout = setTimeout(() => {
       setUserEmail((prev) => (prev === 'loading' ? null : prev));
     }, 3000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) {
-        clearTimeout(timeout);
-        setUserEmail(session?.user?.email || null);
-      }
+      if (!cancelled) { clearTimeout(timeout); setUserEmail(session?.user?.email || null); }
     }).catch(() => {
-      if (!cancelled) {
-        clearTimeout(timeout);
-        setUserEmail(null);
-      }
+      if (!cancelled) { clearTimeout(timeout); setUserEmail(null); }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -64,91 +57,53 @@ export default function HomePage() {
     setTimeout(() => setToastMsg(''), 1800);
   }, []);
 
-  const handleCopy = useCallback(
-    async (text: string) => {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        document.body.removeChild(ta);
-      }
-      toast('已复制到剪贴板');
-    },
-    [toast]
-  );
+  const handleCopy = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    toast('已复制到剪贴板');
+  }, [toast]);
 
   if (userEmail === 'loading') {
     return (
       <div className="auth-page">
         <div className="auth-card">
-          <div className="auth-header">
-            <h1>Tutor 课后反馈生成器</h1>
-          </div>
-          <div className="auth-body" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.88rem' }}>
-            检查登录状态...
-          </div>
+          <div className="auth-header"><h1>Tutor 课后反馈生成器</h1></div>
+          <div className="auth-body" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.88rem' }}>检查登录状态...</div>
         </div>
       </div>
     );
   }
 
   if (!userEmail) {
-    return <AuthForm onLogin={() => {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        setUserEmail(session?.user?.email || null);
-      }).catch(() => {});
-    }} />;
+    return <AuthForm onLogin={() => { supabase.auth.getSession().then(({ data: { session } }) => { setUserEmail(session?.user?.email || null); }).catch(() => {}); }} />;
   }
 
   return (
     <div className="container">
       <UserMenu email={userEmail} onLogout={() => setUserEmail(null)} />
-
-      <div className="header">
-        <h1>Tutor 课后反馈生成器</h1>
-        <div className="sub">把课堂随记变成自然、得体的家长反馈</div>
-      </div>
+      <div className="header"><h1>Tutor 课后反馈生成器</h1><div className="sub">把课堂随记变成自然、得体的家长反馈</div></div>
 
       <div className="tab-nav">
         {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            className={`tab-btn${activeTab === tab.id ? ' active' : ''}`}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
-          </button>
+          <button key={tab.id} className={`tab-btn${activeTab === tab.id ? ' active' : ''}`} onClick={() => setActiveTab(tab.id)}>{tab.label}</button>
         ))}
       </div>
 
-      <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
-        <DashboardTab
-          onNavigate={(tab) => setActiveTab(tab as TabId)}
-          onSelectStudent={(id) => setPendingStudentId(id)}
-        />
-      </div>
-
-      <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}>
-        <RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={importFeedbackData} preFillNotes={importFeedbackNotes} />
-      </div>
-
-      <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}>
-        <RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={importHomeworkLinks.link1 ? importHomeworkLinks : undefined} />
-      </div>
-
-      <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}>
-        <MeetingReminder toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} />
-      </div>
-
-      <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>
-        <StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} />
-      </div>
+      <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}><DashboardTab onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
+      <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}><RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={importFeedbackData} preFillNotes={importFeedbackNotes} /></div>
+      <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}><RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={importHomeworkLinks.link1 ? importHomeworkLinks : undefined} /></div>
+      <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}><MeetingReminder toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} /></div>
+      <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}><StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
 
       <div style={{ display: activeTab === 'import' ? 'block' : 'none' }}>
         <ImportAssistantTab
@@ -157,6 +112,7 @@ export default function HomePage() {
           onFillHomework={(l1, l2, l3, name) => setImportHomeworkLinks({ link1: l1, link2: l2, link3: l3, studentName: name })}
           onNavigate={(tab) => setActiveTab(tab as TabId)}
         />
+        <EnglishSystemGuide toast={toast} />
       </div>
 
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>
