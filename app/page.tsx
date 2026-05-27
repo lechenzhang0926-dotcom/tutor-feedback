@@ -28,17 +28,30 @@ export default function HomePage() {
 
   useEffect(() => {
     let cancelled = false;
+
+    // 3 秒后如果 Supabase 没响应，直接放行到登录页
+    const timeout = setTimeout(() => {
+      setUserEmail((prev) => (prev === 'loading' ? null : prev));
+    }, 3000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) setUserEmail(session?.user?.email || null);
+      if (!cancelled) {
+        clearTimeout(timeout);
+        setUserEmail(session?.user?.email || null);
+      }
     }).catch(() => {
-      if (!cancelled) setUserEmail(null);
+      if (!cancelled) {
+        clearTimeout(timeout);
+        setUserEmail(null);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      clearTimeout(timeout);
       setUserEmail(session?.user?.email || null);
     });
 
-    return () => { cancelled = true; subscription.unsubscribe(); };
+    return () => { cancelled = true; clearTimeout(timeout); subscription.unsubscribe(); };
   }, []);
 
   const toast = useCallback((msg: string) => {
