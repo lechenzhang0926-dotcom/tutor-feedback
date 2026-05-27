@@ -81,7 +81,7 @@ export function parseImportedText(text: string): ParsedImport {
 
   // 提取 URL
   const urlMatches = text.match(/https?:\/\/[^\s,，\n]+/gi) || [];
-  const uniqueUrls = [...new Set(urlMatches)];
+  const uniqueUrls = Array.from(new Set(urlMatches));
 
   if (uniqueUrls.length > 0) result.link1 = uniqueUrls[0];
   if (uniqueUrls.length > 1) result.link2 = uniqueUrls[1];
