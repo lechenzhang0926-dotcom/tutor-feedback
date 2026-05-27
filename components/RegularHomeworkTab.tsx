@@ -264,12 +264,12 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId }: Props)
         </div>
 
         <div className="field">
-          <label>课后作业 1 链接 <span className="hint">（中英文/英文/中文/音标 PDF 打印）</span></label>
-          <input
-            type="text"
-            placeholder="https://test.hzdmsyy.com/pc/prints?id=247343"
+          <label>课后作业 1 链接 <span className="hint">（可输入一个打印页面链接，或粘贴多个 PDF 直链，换行分隔）</span></label>
+          <textarea
+            placeholder="https://test.hzdmsyy.com/pc/prints?id=247343&#10;&#10;或粘贴多个 PDF 直链：&#10;https://fqyy.zzfq888.com/uploads/pdf/xxx.pdf&#10;https://fqyy.zzfq888.com/uploads/pdf/yyy.pdf&#10;https://fqyy.zzfq888.com/uploads/pdf/zzz.pdf"
             value={link1}
             onChange={(e) => setLink1(e.target.value)}
+            style={{ minHeight: 80 }}
           />
         </div>
 

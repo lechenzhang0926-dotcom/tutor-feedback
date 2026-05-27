@@ -9,6 +9,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
+import { parseLink1Input, getPdfDirectTasks } from '@/lib/homeworkUtils';
 
 interface PdfTask {
   name: string;
@@ -47,15 +48,22 @@ export async function POST(request: NextRequest) {
 
     const prefix = `${studentName}-${date}`;
     const tasks: PdfTask[] = [];
-    const normalizedLink1 = link1 ? normalizeUrl(link1) : '';
+    let pagePrintLink1 = ''; // link1 的页面打印 URL（仅 page 模式有值）
 
     if (link1) {
-      tasks.push(
-        { name: `${prefix}-中英文.pdf`, url: normalizedLink1 },
-        { name: `${prefix}-英文.pdf`,   url: normalizedLink1 },
-        { name: `${prefix}-中文.pdf`,   url: normalizedLink1 },
-        { name: `${prefix}-音标.pdf`,   url: normalizedLink1 },
-      );
+      const parsed = parseLink1Input(link1);
+      if (parsed.mode === 'pdf-direct' && parsed.pdfUrls) {
+        tasks.push(...getPdfDirectTasks(prefix, parsed.pdfUrls));
+      } else if (parsed.mode === 'page' && parsed.pageUrl) {
+        const pageUrl = normalizeUrl(parsed.pageUrl);
+        pagePrintLink1 = pageUrl;
+        tasks.push(
+          { name: `${prefix}-中英文.pdf`, url: pageUrl },
+          { name: `${prefix}-英文.pdf`,   url: pageUrl },
+          { name: `${prefix}-中文.pdf`,   url: pageUrl },
+          { name: `${prefix}-音标.pdf`,   url: pageUrl },
+        );
+      }
     }
 
     if (link2) {
@@ -102,6 +110,19 @@ export async function POST(request: NextRequest) {
     for (const task of tasks) {
       let context;
       try {
+        // PDF 直链：直接 fetch 下载
+        if (task.url.endsWith('.pdf')) {
+          const resp = await fetch(task.url);
+          if (!resp.ok) throw new Error(`下载 PDF 失败 HTTP ${resp.status}`);
+          const arr = await resp.arrayBuffer();
+          const pdfBuffer = Buffer.from(arr);
+          const filePath = path.join(sessionDir, task.name);
+          await fs.writeFile(filePath, pdfBuffer);
+          files.push({ name: task.name, size: pdfBuffer.length });
+          continue;
+        }
+
+        // 页面打印模式：Playwright 打开 + PDF
         context = await browser.newContext();
         const page = await context.newPage();
 
@@ -110,8 +131,7 @@ export async function POST(request: NextRequest) {
           timeout: 30000,
         });
 
-        // link1 的 4 个变体需要切换打印版本
-        const isLink1Task = link1 && task.url === normalizedLink1;
+        const isLink1Task = pagePrintLink1 && task.url === pagePrintLink1;
         if (isLink1Task) {
           const version = inferPrintVersion(task.name);
           if (version) {
