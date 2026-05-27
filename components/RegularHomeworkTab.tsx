@@ -194,6 +194,7 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
               <option key={s.id} value={s.id}>{s.name}</option>
             ))}
           </select>
+          <div style={{ fontSize: '.74rem', color: 'var(--muted)', marginTop: 4 }}>选择学生后会自动填入名字，也可以手动修改。</div>
         </div>
 
         <div className="field">

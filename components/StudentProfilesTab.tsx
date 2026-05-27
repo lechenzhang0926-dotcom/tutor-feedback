@@ -11,9 +11,11 @@ import { COURSE_TYPE_LABEL } from '@/lib/types';
 
 interface Props {
   toast: (msg: string) => void;
+  onNavigate?: (tab: string) => void;
+  onSelectStudent?: (id: string) => void;
 }
 
-export function StudentProfilesTab({ toast }: Props) {
+export function StudentProfilesTab({ toast, onNavigate, onSelectStudent }: Props) {
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
@@ -147,11 +149,24 @@ export function StudentProfilesTab({ toast }: Props) {
             </div>
           )}
 
-          <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginBottom: 8 }}>
-            最近反馈：{s.recentFeedbacks.length} 条
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, fontSize: '.75rem', color: 'var(--muted)', marginBottom: 8 }}>
+            <span>反馈 {s.recentFeedbacks.length} 条</span>
+            <span>·</span>
+            <span>常忘词 {s.commonWeakWords?.length || 0} 个</span>
+            <span>·</span>
+            <span>{hasData(s) ? '学习特点已积累' : '尚未积累'}</span>
           </div>
 
           <div className="btn-row">
+            {onNavigate && onSelectStudent && (
+              <button
+                className="btn btn-ghost"
+                onClick={() => { onSelectStudent(s.id); onNavigate('regular-feedback'); }}
+                style={{ fontSize: '.8rem', padding: '6px 14px' }}
+              >
+                开始反馈
+              </button>
+            )}
             <button
               className="btn btn-ghost"
               onClick={() => setViewingHistory(s)}
@@ -217,4 +232,8 @@ function formatDate(iso: string): string {
 function formatShort(iso: string): string {
   const d = new Date(iso);
   return `${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function hasData(s: StudentProfile): boolean {
+  return !!(s.textbook || (s.commonWeakWords?.length) || (s.commonIssues?.length) || (s.strengths?.length));
 }

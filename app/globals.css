@@ -52,25 +52,25 @@ body {
 .container {
   max-width: 1020px;
   margin: 0 auto;
-  padding: 16px 24px 60px;
+  padding: 10px 24px 60px;
   position: relative;
 }
 
 /* ====== Header ====== */
 .header {
   text-align: center;
-  padding: 16px 0 4px;
+  padding: 8px 0 2px;
 }
 .header h1 {
-  font-size: 1.35rem;
+  font-size: 1.25rem;
   font-weight: 700;
   letter-spacing: .03em;
   color: var(--text);
 }
 .header .sub {
-  font-size: .82rem;
+  font-size: .78rem;
   color: var(--muted);
-  margin-top: 4px;
+  margin-top: 2px;
   font-weight: 400;
 }
 
@@ -594,7 +594,7 @@ body {
 /* ====== Top Bar (user menu) ====== */
 .top-bar {
   position: absolute;
-  top: 12px;
+  top: 6px;
   right: 24px;
   z-index: 10;
 }

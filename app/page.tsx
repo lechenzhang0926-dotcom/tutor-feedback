@@ -128,7 +128,7 @@ export default function HomePage() {
       </div>
 
       <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>
-        <StudentProfilesTab toast={toast} />
+        <StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} />
       </div>
 
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>

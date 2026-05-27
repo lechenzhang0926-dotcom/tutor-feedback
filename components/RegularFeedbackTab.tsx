@@ -44,6 +44,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [selectedPhrases, setSelectedPhrases] = useState<string[]>([]);
   const [customPhrases, setCustomPhrases] = useState<string[]>([]);
+  const [phrasesExpanded, setPhrasesExpanded] = useState(false);
   const [error, setError] = useState('');
   const [remaining, setRemaining] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -348,13 +349,12 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
         <div className="field">
           <label>常用反馈短语</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {getDefaultFeedbackPhrases().map((phrase) => {
+            {(phrasesExpanded ? getDefaultFeedbackPhrases() : getDefaultFeedbackPhrases().slice(0, 8)).map((phrase) => {
               const active = selectedPhrases.includes(phrase);
               return (
                 <button
                   key={phrase}
                   onClick={() => togglePhrase(phrase)}
-                  className={`phrase-tag${active ? ' active' : ''}`}
                   style={{
                     fontSize: '.78rem',
                     padding: '4px 12px',
@@ -372,12 +372,29 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
                 </button>
               );
             })}
+            <button
+              onClick={() => setPhrasesExpanded(!phrasesExpanded)}
+              style={{
+                fontSize: '.76rem', padding: '4px 12px', borderRadius: 16,
+                border: '1px dashed var(--border)', background: 'transparent',
+                color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              {phrasesExpanded ? '收起' : `展开更多 (${getDefaultFeedbackPhrases().length - 8})`}
+            </button>
           </div>
         </div>
 
+        {/* 已选择短语 */}
+        {selectedPhrases.length > 0 && (
+          <div style={{ marginBottom: 14, padding: '8px 12px', background: 'var(--accent-light)', borderRadius: 8, fontSize: '.78rem', color: 'var(--text)' }}>
+            已选择：{selectedPhrases.join('、')}
+          </div>
+        )}
+
         {customPhrases.length > 0 && (
           <div className="field">
-            <label>个性化短语 <span className="hint">（自动积累，点击标签可删除）</span></label>
+            <label>个性化短语 <span className="hint">（自动积累，双击可删除）</span></label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {customPhrases.map((phrase) => {
                 const active = selectedPhrases.includes(phrase);
@@ -385,7 +402,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
                   <button
                     key={phrase}
                     onClick={() => togglePhrase(phrase)}
-                    title="在个性化短语区双击可删除此标签"
+                    onDoubleClick={() => { deleteCustomPhrase(phrase); setCustomPhrases(getCustomFeedbackPhrases()); setSelectedPhrases((prev) => prev.filter((p) => p !== phrase)); }}
                     style={{
                       fontSize: '.78rem',
                       padding: '4px 12px',
