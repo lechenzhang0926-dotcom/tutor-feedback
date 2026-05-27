@@ -353,6 +353,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
             onOcr={handleOcr}
             ocrLoading={ocrLoading}
             fileInputRef={fileInputRef}
+            toast={toast}
           />
         </div>
 
@@ -597,8 +598,35 @@ function DropZone({
   onOcr: () => void;
   ocrLoading: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
+  toast?: (msg: string) => void;
 }) {
   const [dragOver, setDragOver] = useState(false);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (!file) return;
+          if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+            toast?.('仅支持 PNG/JPG 图片');
+            return;
+          }
+          onFileDrop(file);
+          return;
+        }
+      }
+      // 如果有文字在剪贴板但没有图片，且焦点在这个区域，提示
+      const hasText = Array.from(items).some((item) => item.type === 'text/plain');
+      if (!hasText) {
+        toast?.('剪贴板中没有可上传的图片');
+      }
+    },
+    [onFileDrop, toast]
+  );
 
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
@@ -618,6 +646,7 @@ function DropZone({
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
+        onPaste={handlePaste}
         onClick={() => fileInputRef.current?.click()}
         className={`drop-zone${dragOver ? ' drag-over' : ''}`}
       >
@@ -636,7 +665,7 @@ function DropZone({
         ) : (
           <>
             <div className="drop-zone-icon">{dragOver ? '📂' : '📁'}</div>
-            <div className="drop-zone-text">拖拽截图至此区域，或点击上传</div>
+            <div className="drop-zone-text">点击上传、拖拽图片，或直接 Ctrl+V 粘贴截图</div>
             <div className="drop-zone-hint">支持 PNG / JPG</div>
           </>
         )}
