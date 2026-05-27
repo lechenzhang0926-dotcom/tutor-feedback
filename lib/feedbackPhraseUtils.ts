@@ -75,7 +75,7 @@ export function updateCustomPhrasesFromUsage(
 
   // 合并已有个性化短语和新候选
   const merged = new Set(existing);
-  for (const [phrase] of [...candidates.entries()].sort((a, b) => b[1] - a[1])) {
+  for (const [phrase] of Array.from(candidates.entries()).sort((a, b) => b[1] - a[1])) {
     if (merged.size >= MAX_CUSTOM) break;
     merged.add(phrase);
   }
