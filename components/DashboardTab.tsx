@@ -11,8 +11,7 @@ interface Props {
 }
 
 export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
-  const [selectValue, setSelectValue] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [activeStudentId, setActiveStudentId] = useState('');
   const students = getStudents();
   const totalStats = getTotalStats();
   const recentIds = getRecentStudentIds();
@@ -26,23 +25,13 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
 
   const handleSelect = (id: string) => {
     if (!id) return;
-    const s = getStudentById(id);
-    if (!s) return;
+    setActiveStudentId(id);
     onSelectStudent(id);
     recordStudentUsage(id);
-    setSelectedTags((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    // 重置下拉框，以便可以再次选择同一个学生
-    setSelectValue('');
-  };
-
-  const removeTag = (id: string) => {
-    setSelectedTags((prev) => prev.filter((t) => t !== id));
   };
 
   const handleAction = (tab: string) => {
-    // 使用最后一个已选标签
-    const activeId = selectedTags.length > 0 ? selectedTags[selectedTags.length - 1] : '';
-    if (activeId) onSelectStudent(activeId);
+    if (activeStudentId) onSelectStudent(activeStudentId);
     onNavigate(tab);
   };
 
@@ -60,7 +49,7 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
         {/* 选择学生 */}
         <div className="field" style={{ marginBottom: 12 }}>
           <select
-            value={selectValue}
+            value={activeStudentId}
             onChange={(e) => handleSelect(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', fontSize: '.9rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
           >
@@ -71,28 +60,25 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
           </select>
         </div>
 
-        {/* 已选学生标签 */}
-        {selectedTags.length > 0 && (
+        {/* 最近学生快捷按钮 */}
+        {recentStudents.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-            {selectedTags.map((id) => {
-              const s = getStudentById(id);
-              return s ? (
-                <span key={id} style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '5px 8px 5px 14px', borderRadius: 16,
-                  border: '1px solid var(--accent)', background: 'var(--accent-light)',
-                  fontSize: '.84rem', fontWeight: 500, color: 'var(--accent)',
-                }}>
-                  {s.name}
-                  <span
-                    onClick={(e) => { e.stopPropagation(); removeTag(id); }}
-                    style={{ cursor: 'pointer', opacity: .35, fontSize: '.9rem', lineHeight: 1, padding: '0 4px', transition: 'opacity .15s' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
-                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.35')}
-                  >×</span>
-                </span>
-              ) : null;
-            })}
+            {recentStudents.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => handleSelect(s.id)}
+                style={{
+                  fontSize: '.84rem', padding: '6px 14px', borderRadius: 16,
+                  border: activeStudentId === s.id ? '1px solid var(--accent)' : '1px solid var(--border)',
+                  background: activeStudentId === s.id ? 'var(--accent-light)' : 'var(--card)',
+                  color: activeStudentId === s.id ? 'var(--accent)' : 'var(--muted)',
+                  cursor: 'pointer', fontFamily: 'inherit', fontWeight: activeStudentId === s.id ? 600 : 400,
+                  transition: 'all .15s',
+                }}
+              >
+                {s.name}
+              </button>
+            ))}
           </div>
         )}
 
