@@ -80,5 +80,5 @@ export function updateCustomPhrasesFromUsage(
     merged.add(phrase);
   }
 
-  return [...merged].slice(0, MAX_CUSTOM);
+  return Array.from(merged).slice(0, MAX_CUSTOM);
 }
