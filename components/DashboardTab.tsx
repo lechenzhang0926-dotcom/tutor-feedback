@@ -12,6 +12,7 @@ interface Props {
 
 export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
   const [selectValue, setSelectValue] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const students = getStudents();
   const totalStats = getTotalStats();
   const recentIds = getRecentStudentIds();
@@ -24,13 +25,21 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
   }
 
   const handleSelect = (id: string) => {
+    if (!id) return;
     setSelectValue(id);
     onSelectStudent(id);
     recordStudentUsage(id);
+    setSelectedTags((prev) => (prev.includes(id) ? prev : [...prev, id]));
+  };
+
+  const removeTag = (id: string) => {
+    setSelectedTags((prev) => prev.filter((t) => t !== id));
   };
 
   const handleAction = (tab: string) => {
-    if (selectValue) onSelectStudent(selectValue);
+    // 优先用最后一个已选标签，否则用下拉框当前值
+    const activeId = selectedTags.length > 0 ? selectedTags[selectedTags.length - 1] : selectValue;
+    if (activeId) onSelectStudent(activeId);
     onNavigate(tab);
   };
 
@@ -59,22 +68,28 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
           </select>
         </div>
 
-        {/* 最近学生 */}
-        {recentStudents.length > 0 && (
+        {/* 已选学生标签 */}
+        {selectedTags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
-            {recentStudents.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => handleSelect(s.id)}
-                className={`dash-student-pill${selectValue === s.id ? ' active' : ''}`}
-                style={selectValue === s.id ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-light)' } : {}}
-              >
-                {s.name}
-                {selectValue === s.id && (
-                  <span onClick={(e) => { e.stopPropagation(); setSelectValue(''); }} style={{ marginLeft: 4, cursor: 'pointer', opacity: .6 }}>×</span>
-                )}
-              </button>
-            ))}
+            {selectedTags.map((id) => {
+              const s = getStudentById(id);
+              return s ? (
+                <span key={id} style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '5px 8px 5px 14px', borderRadius: 16,
+                  border: '1px solid var(--accent)', background: 'var(--accent-light)',
+                  fontSize: '.84rem', fontWeight: 500, color: 'var(--accent)',
+                }}>
+                  {s.name}
+                  <span
+                    onClick={(e) => { e.stopPropagation(); removeTag(id); }}
+                    style={{ cursor: 'pointer', opacity: .35, fontSize: '.9rem', lineHeight: 1, padding: '0 4px', transition: 'opacity .15s' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.opacity = '0.7')}
+                    onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.35')}
+                  >×</span>
+                </span>
+              ) : null;
+            })}
           </div>
         )}
 
