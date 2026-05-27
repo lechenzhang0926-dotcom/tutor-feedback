@@ -73,7 +73,15 @@ export function getStudents(): StudentProfile[] {
   if (typeof window === 'undefined') return [];
 
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+    const raw: StudentProfile[] = JSON.parse(localStorage.getItem(STORAGE_KEYS.students) || '[]');
+    // 按创建时间从早到晚排序，缺失 createdAt 的按 name 拼音兜底
+    raw.sort((a, b) => {
+      if (a.createdAt && b.createdAt) return a.createdAt.localeCompare(b.createdAt);
+      if (a.createdAt) return -1;
+      if (b.createdAt) return 1;
+      return a.name.localeCompare(b.name, 'zh-Hans');
+    });
+    return raw;
   } catch {
     return [];
   }
