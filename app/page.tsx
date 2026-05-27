@@ -25,6 +25,7 @@ export default function HomePage() {
   const [toastMsg, setToastMsg] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [pendingStudentId, setPendingStudentId] = useState('');
 
   useEffect(() => {
     const check = async () => {
@@ -109,15 +110,14 @@ export default function HomePage() {
 
       <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}>
         <DashboardTab
-          userEmail={userEmail ?? undefined}
           onNavigate={(tab) => setActiveTab(tab as TabId)}
-          onSelectStudent={() => {}}
+          onSelectStudent={(id) => setPendingStudentId(id)}
           onCopy={handleCopy}
         />
       </div>
 
       <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}>
-        <RegularFeedbackTab toast={toast} />
+        <RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} />
       </div>
 
       <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}>

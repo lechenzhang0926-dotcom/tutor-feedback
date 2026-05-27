@@ -21,14 +21,16 @@ import {
 
 interface Props {
   toast: (msg: string) => void;
+  preSelectStudentId?: string;
 }
 
-export function RegularFeedbackTab({ toast }: Props) {
+export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
   const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [image, setImage] = useState<File | null>(null);
 
   useEffect(() => { setMounted(true); setCustomPhrases(getCustomFeedbackPhrases()); }, []);
+  useEffect(() => { if (preSelectStudentId) setSelectedStudentId(preSelectStudentId); }, [preSelectStudentId]);
   const [imagePreview, setImagePreview] = useState('');
   const [compressedImage, setCompressedImage] = useState<string | null>(null);
   const [feedbackType, setFeedbackType] = useState<'regular' | 'anti-forgetting'>('regular');

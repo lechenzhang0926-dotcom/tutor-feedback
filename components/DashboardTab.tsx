@@ -1,19 +1,19 @@
 'use client';
 
-import { getTodayActivity, getRecentStudentIds } from '@/lib/dashboardUtils';
+import { useState } from 'react';
+import { getRecentStudentIds, recordStudentUsage } from '@/lib/dashboardUtils';
 import { getStudents, getHistory, getStudentById } from '@/lib/storage';
 import { COURSE_TYPE_LABEL } from '@/lib/types';
 import type { FeedbackRecord, StudentProfile } from '@/lib/types';
 
 interface Props {
-  userEmail?: string;
   onNavigate: (tab: string) => void;
   onSelectStudent: (studentId: string) => void;
   onCopy: (text: string) => void;
 }
 
 export function DashboardTab({ onNavigate, onSelectStudent, onCopy }: Props) {
-  const activity = getTodayActivity();
+  const [selectedId, setSelectedId] = useState('');
   const students = getStudents();
   const history = getHistory();
   const recentIds = getRecentStudentIds();
@@ -24,136 +24,140 @@ export function DashboardTab({ onNavigate, onSelectStudent, onCopy }: Props) {
     if (s) recentStudents.push(s);
     if (recentStudents.length >= 5) break;
   }
-  if (recentStudents.length < 5) {
-    for (const s of students) {
-      if (!recentStudents.find((rs) => rs.id === s.id)) {
-        recentStudents.push(s);
-        if (recentStudents.length >= 5) break;
-      }
-    }
-  }
+
+  const handleSelect = (id: string) => {
+    setSelectedId(id);
+    onSelectStudent(id);
+    recordStudentUsage(id);
+  };
+
+  const handleAction = (tab: string) => {
+    if (selectedId) onSelectStudent(selectedId);
+    onNavigate(tab);
+  };
 
   const recentFeedbacks = history.slice(0, 5);
 
   return (
     <div>
-      {/* Header */}
-      <div className="dash-header">
-        <div className="dash-header-left">
-          <div className="dash-welcome">今日工作台</div>
-          <div className="dash-subtitle">先生成课后反馈，再处理正课作业和会议提醒。</div>
-        </div>
-        <div className="dash-flow">
-          <span className="dash-flow-item">① 课后反馈</span>
-          <span className="dash-flow-arrow">→</span>
-          <span className="dash-flow-item">② 正课作业</span>
-          <span className="dash-flow-arrow">→</span>
-          <span className="dash-flow-item">③ 会议提醒</span>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="dash-stats">
-        <div className="dash-stat-card">
-          <span className="dash-stat-icon">📝</span>
-          <span className="dash-stat-num">{activity.feedbackCount}</span>
-          <span className="dash-stat-label">今日反馈</span>
-        </div>
-        <div className="dash-stat-card">
-          <span className="dash-stat-icon">📄</span>
-          <span className="dash-stat-num">{activity.homeworkMsgCount}</span>
-          <span className="dash-stat-label">作业消息</span>
-        </div>
-        <div className="dash-stat-card">
-          <span className="dash-stat-icon">⏰</span>
-          <span className="dash-stat-num">{activity.meetingCount}</span>
-          <span className="dash-stat-label">会议提醒</span>
-        </div>
-        <div className="dash-stat-card">
-          <span className="dash-stat-icon">👩‍🎓</span>
-          <span className="dash-stat-num">{students.length}</span>
-          <span className="dash-stat-label">学生档案</span>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="dash-actions">
-        <button className="dash-action-card" onClick={() => onNavigate('regular-feedback')}>
-          <div className="dash-action-body">
-            <span className="dash-action-icon">📝</span>
-            <div>
-              <div className="dash-action-label">生成课后反馈</div>
-              <div className="dash-action-desc">把课堂记录整理成家长可读反馈</div>
-            </div>
+      {/* 今日工作台 */}
+      <div className="card" style={{ padding: '20px 24px' }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: '1.05rem', fontWeight: 600, marginBottom: 2 }}>今日工作台</div>
+          <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
+            选择学生后，可以快速生成课后反馈、正课作业和会议提醒。
           </div>
-          <span className="dash-action-btn">开始生成 →</span>
-        </button>
-        <button className="dash-action-card" onClick={() => onNavigate('regular-homework')}>
-          <div className="dash-action-body">
-            <span className="dash-action-icon">📄</span>
-            <div>
-              <div className="dash-action-label">制作正课作业</div>
-              <div className="dash-action-desc">生成作业群消息和打印 PDF</div>
-            </div>
-          </div>
-          <span className="dash-action-btn">开始制作 →</span>
-        </button>
-        <button className="dash-action-card" onClick={() => onNavigate('meeting')}>
-          <div className="dash-action-body">
-            <span className="dash-action-icon">⏰</span>
-            <div>
-              <div className="dash-action-label">生成会议提醒</div>
-              <div className="dash-action-desc">一键生成上课会议通知</div>
-            </div>
-          </div>
-          <span className="dash-action-btn">生成提醒 →</span>
-        </button>
-      </div>
+        </div>
 
-      {/* Recent Students */}
-      <div className="card" style={{ padding: '16px 20px' }}>
-        <div className="card-title" style={{ marginBottom: 10 }}>最近学生</div>
-        {recentStudents.length > 0 ? (
-          <div className="dash-student-row">
+        {/* 选择学生 */}
+        <div className="field" style={{ marginBottom: 12 }}>
+          <select
+            value={selectedId}
+            onChange={(e) => handleSelect(e.target.value)}
+            style={{ width: '100%', padding: '10px 14px', fontSize: '.9rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
+          >
+            <option value="">选择学生（可选）</option>
+            {students.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 最近学生 */}
+        {recentStudents.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
             {recentStudents.map((s) => (
               <button
                 key={s.id}
-                className="dash-student-pill"
-                onClick={() => { onSelectStudent(s.id); onNavigate('regular-feedback'); }}
+                onClick={() => handleSelect(s.id)}
+                className={`dash-student-pill${selectedId === s.id ? ' active' : ''}`}
+                style={selectedId === s.id ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-light)' } : {}}
               >
                 {s.name}
-                <span className="dash-student-meta">
-                  反馈 {s.recentFeedbacks.length} · 常忘词 {s.commonWeakWords?.length || 0}
-                </span>
               </button>
             ))}
           </div>
-        ) : (
-          <div style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
-            还没有学生档案，先<a onClick={() => onNavigate('students')} style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>去新增学生</a>后可以自动积累学习特点。
-          </div>
         )}
+
+        {/* 三个操作按钮 */}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className="btn btn-primary" onClick={() => handleAction('regular-feedback')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
+            生成课后反馈
+          </button>
+          <button className="btn btn-primary" onClick={() => handleAction('regular-homework')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
+            制作正课作业
+          </button>
+          <button className="btn btn-primary" onClick={() => handleAction('meeting')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
+            生成会议提醒
+          </button>
+        </div>
       </div>
 
-      {/* Recent Feedbacks */}
+      {/* 今日流程 + 最近学生 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+        {/* 今日流程 */}
+        <div className="card" style={{ padding: '16px 20px' }}>
+          <div className="card-title" style={{ marginBottom: 10 }}>今日流程</div>
+          {['1. 生成课后反馈', '2. 生成正课作业消息 / PDF', '3. 生成会议提醒', '4. 复制发送给家长'].map((step) => (
+            <div key={step} style={{ fontSize: '.82rem', color: 'var(--text)', padding: '4px 0', borderBottom: '1px solid var(--border)' }}>
+              {step}
+            </div>
+          ))}
+        </div>
+
+        {/* 最近学生 */}
+        <div className="card" style={{ padding: '16px 20px' }}>
+          <div className="card-title" style={{ marginBottom: 10 }}>最近学生</div>
+          {recentStudents.length > 0 ? (
+            recentStudents.map((s) => (
+              <div key={s.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '.84rem' }}>
+                <div>
+                  <span style={{ fontWeight: 500 }}>{s.name}</span>
+                  <span style={{ fontSize: '.7rem', color: 'var(--muted)', marginLeft: 8 }}>
+                    反馈 {s.recentFeedbacks.length} · 常忘词 {s.commonWeakWords?.length || 0}
+                  </span>
+                </div>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: '.74rem', padding: '3px 10px' }}
+                  onClick={() => { handleSelect(s.id); onNavigate('regular-feedback'); }}
+                >
+                  开始反馈
+                </button>
+              </div>
+            ))
+          ) : (
+            <div style={{ fontSize: '.82rem', color: 'var(--muted)', lineHeight: 1.6 }}>
+              还没有学生档案，先<a onClick={() => onNavigate('students')} style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>去新增学生</a>吧。
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 最近反馈 */}
       <div className="card" style={{ padding: '16px 20px' }}>
         <div className="card-title" style={{ marginBottom: 10 }}>最近反馈</div>
         {recentFeedbacks.length === 0 ? (
           <div style={{ fontSize: '.82rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-            还没有生成反馈。生成第一条课后反馈后，会在这里显示。
+            还没有生成反馈。生成第一条反馈后，可以在这里快速复制。
             {' '}
             <a onClick={() => onNavigate('regular-feedback')} style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>去生成反馈</a>
           </div>
         ) : (
           recentFeedbacks.map((fb: FeedbackRecord) => (
-            <div key={fb.id} className="dash-feedback-item">
-              <div className="dash-feedback-meta">
+            <div key={fb.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.72rem', color: 'var(--muted)', marginBottom: 3 }}>
                 <span>{formatDate(fb.createdAt)}</span>
                 <span>{fb.studentName}</span>
                 <span className="tag">{COURSE_TYPE_LABEL[fb.courseType] || '正课'}</span>
-                <button className="dash-feedback-copy" onClick={() => onCopy(fb.feedback)}>复制</button>
+                <button
+                  onClick={() => onCopy(fb.feedback)}
+                  style={{ marginLeft: 'auto', fontSize: '.72rem', background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit' }}
+                >
+                  复制
+                </button>
               </div>
-              <div className="dash-feedback-text">{truncate(fb.feedback, 80)}</div>
+              <div style={{ fontSize: '.82rem', lineHeight: 1.55 }}>{truncate(fb.feedback, 80)}</div>
             </div>
           ))
         )}
