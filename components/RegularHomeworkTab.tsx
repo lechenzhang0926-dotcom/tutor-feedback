@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { buildHomeworkMessage } from '@/lib/homeworkMessage';
 import { getStudents, getStudentById } from '@/lib/storage';
-import { incrementHomeworkMsgCount, recordStudentUsage } from '@/lib/dashboardUtils';
+import { incrementHomeworkMsgCount, incrementTotalHomeworkCount, recordStudentUsage } from '@/lib/dashboardUtils';
 
 interface Props {
   toast: (msg: string) => void;
@@ -80,6 +80,7 @@ export function RegularHomeworkTab({ toast, onCopy }: Props) {
     });
     setMsgGenerated(true);
     incrementHomeworkMsgCount();
+    incrementTotalHomeworkCount();
     if (selectedStudentId) recordStudentUsage(selectedStudentId);
     toast('消息已生成，点击下方复制按钮');
   }, [studentName, date, link1, selectedStudentId, toast]);

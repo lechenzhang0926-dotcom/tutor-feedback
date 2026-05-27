@@ -1,21 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { getRecentStudentIds, recordStudentUsage } from '@/lib/dashboardUtils';
-import { getStudents, getHistory, getStudentById } from '@/lib/storage';
-import { COURSE_TYPE_LABEL } from '@/lib/types';
-import type { FeedbackRecord, StudentProfile } from '@/lib/types';
+import { getRecentStudentIds, getTotalStats, recordStudentUsage } from '@/lib/dashboardUtils';
+import { getStudents, getStudentById } from '@/lib/storage';
+import type { StudentProfile } from '@/lib/types';
 
 interface Props {
   onNavigate: (tab: string) => void;
   onSelectStudent: (studentId: string) => void;
-  onCopy: (text: string) => void;
 }
 
-export function DashboardTab({ onNavigate, onSelectStudent, onCopy }: Props) {
+export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
   const [selectedId, setSelectedId] = useState('');
   const students = getStudents();
-  const history = getHistory();
+  const totalStats = getTotalStats();
   const recentIds = getRecentStudentIds();
 
   const recentStudents: StudentProfile[] = [];
@@ -35,8 +33,6 @@ export function DashboardTab({ onNavigate, onSelectStudent, onCopy }: Props) {
     if (selectedId) onSelectStudent(selectedId);
     onNavigate(tab);
   };
-
-  const recentFeedbacks = history.slice(0, 5);
 
   return (
     <div>
@@ -134,43 +130,32 @@ export function DashboardTab({ onNavigate, onSelectStudent, onCopy }: Props) {
         </div>
       </div>
 
-      {/* 最近反馈 */}
+      {/* 已完成统计 */}
       <div className="card" style={{ padding: '16px 20px' }}>
-        <div className="card-title" style={{ marginBottom: 10 }}>最近反馈</div>
-        {recentFeedbacks.length === 0 ? (
-          <div style={{ fontSize: '.82rem', color: 'var(--muted)', lineHeight: 1.6 }}>
-            还没有生成反馈。生成第一条反馈后，可以在这里快速复制。
-            {' '}
-            <a onClick={() => onNavigate('regular-feedback')} style={{ color: 'var(--accent)', cursor: 'pointer', textDecoration: 'underline' }}>去生成反馈</a>
+        <div className="card-title" style={{ marginBottom: 10 }}>已完成统计</div>
+        <div className="dash-stats">
+          <div className="dash-stat-card">
+            <span className="dash-stat-icon">📝</span>
+            <span className="dash-stat-num">{totalStats.feedbackCount}</span>
+            <span className="dash-stat-label">课后反馈</span>
           </div>
-        ) : (
-          recentFeedbacks.map((fb: FeedbackRecord) => (
-            <div key={fb.id} style={{ padding: '8px 0', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.72rem', color: 'var(--muted)', marginBottom: 3 }}>
-                <span>{formatDate(fb.createdAt)}</span>
-                <span>{fb.studentName}</span>
-                <span className="tag">{COURSE_TYPE_LABEL[fb.courseType] || '正课'}</span>
-                <button
-                  onClick={() => onCopy(fb.feedback)}
-                  style={{ marginLeft: 'auto', fontSize: '.72rem', background: 'none', border: 'none', color: 'var(--accent)', cursor: 'pointer', fontFamily: 'inherit' }}
-                >
-                  复制
-                </button>
-              </div>
-              <div style={{ fontSize: '.82rem', lineHeight: 1.55 }}>{truncate(fb.feedback, 80)}</div>
-            </div>
-          ))
-        )}
+          <div className="dash-stat-card">
+            <span className="dash-stat-icon">📄</span>
+            <span className="dash-stat-num">{totalStats.homeworkCount}</span>
+            <span className="dash-stat-label">正课作业</span>
+          </div>
+          <div className="dash-stat-card">
+            <span className="dash-stat-icon">⏰</span>
+            <span className="dash-stat-num">{totalStats.meetingCount}</span>
+            <span className="dash-stat-label">会议提醒</span>
+          </div>
+          <div className="dash-stat-card">
+            <span className="dash-stat-icon">👩‍🎓</span>
+            <span className="dash-stat-num">{students.length}</span>
+            <span className="dash-stat-label">已保存学生</span>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
-
-function truncate(text: string, n: number): string {
-  return text.length > n ? text.slice(0, n) + '...' : text;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }

@@ -11,7 +11,7 @@ import {
 } from '@/lib/storage';
 import { updateProfileFromFeedback } from '@/lib/studentProfileUtils';
 import type { StudentProfile, FeedbackRecord } from '@/lib/types';
-import { incrementFeedbackCount, recordStudentUsage } from '@/lib/dashboardUtils';
+import { incrementFeedbackCount, incrementTotalFeedbackCount, recordStudentUsage } from '@/lib/dashboardUtils';
 import {
   getDefaultFeedbackPhrases,
   getCustomFeedbackPhrases,
@@ -211,6 +211,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
       setCurrentVersion(0);
       incrementDailyCount();
       incrementFeedbackCount();
+      incrementTotalFeedbackCount();
       if (selectedStudentId) recordStudentUsage(selectedStudentId);
 
       // 更新个性化短语

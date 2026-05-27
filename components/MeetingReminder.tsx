@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { getStudents, getStudentById } from '@/lib/storage';
-import { incrementMeetingCount, recordStudentUsage } from '@/lib/dashboardUtils';
+import { incrementMeetingCount, incrementTotalMeetingCount, recordStudentUsage } from '@/lib/dashboardUtils';
 
 type MeetingType = 'regular' | 'anti-forgetting' | 'both';
 
@@ -69,6 +69,7 @@ export function MeetingReminder({ toast, onCopy }: Props) {
 
     setMessage(msg);
     incrementMeetingCount();
+    incrementTotalMeetingCount();
     if (selectedStudentId) recordStudentUsage(selectedStudentId);
   }, [meetingType, studentName, meetingId, meetingTime, selectedStudentId, toast]);
 
