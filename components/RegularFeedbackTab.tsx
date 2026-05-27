@@ -126,8 +126,6 @@ export function RegularFeedbackTab({ toast }: Props) {
     setSelectedPhrases((prev) => prev.filter((p) => p !== phrase));
   }, []);
 
-  const defaultPhrases = getDefaultFeedbackPhrases();
-
   // --------------- OCR 识别 ---------------
 
   const handleOcr = useCallback(async () => {
@@ -344,7 +342,7 @@ export function RegularFeedbackTab({ toast }: Props) {
         <div className="field">
           <label>常用反馈短语</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {defaultPhrases.map((phrase) => {
+            {getDefaultFeedbackPhrases().map((phrase) => {
               const active = selectedPhrases.includes(phrase);
               return (
                 <button
@@ -381,8 +379,7 @@ export function RegularFeedbackTab({ toast }: Props) {
                   <button
                     key={phrase}
                     onClick={() => togglePhrase(phrase)}
-                    onDoubleClick={() => handleDeleteCustom(phrase)}
-                    title="双击删除此标签"
+                    title="在个性化短语区双击可删除此标签"
                     style={{
                       fontSize: '.78rem',
                       padding: '4px 12px',
