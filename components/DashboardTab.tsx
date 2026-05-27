@@ -11,7 +11,7 @@ interface Props {
 }
 
 export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
-  const [selectedId, setSelectedId] = useState('');
+  const [selectValue, setSelectValue] = useState('');
   const students = getStudents();
   const totalStats = getTotalStats();
   const recentIds = getRecentStudentIds();
@@ -24,13 +24,13 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
   }
 
   const handleSelect = (id: string) => {
-    setSelectedId(id);
+    setSelectValue(id);
     onSelectStudent(id);
     recordStudentUsage(id);
   };
 
   const handleAction = (tab: string) => {
-    if (selectedId) onSelectStudent(selectedId);
+    if (selectValue) onSelectStudent(selectValue);
     onNavigate(tab);
   };
 
@@ -48,7 +48,7 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
         {/* 选择学生 */}
         <div className="field" style={{ marginBottom: 12 }}>
           <select
-            value={selectedId}
+            value={selectValue}
             onChange={(e) => handleSelect(e.target.value)}
             style={{ width: '100%', padding: '10px 14px', fontSize: '.9rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
           >
@@ -66,12 +66,12 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
               <button
                 key={s.id}
                 onClick={() => handleSelect(s.id)}
-                className={`dash-student-pill${selectedId === s.id ? ' active' : ''}`}
-                style={selectedId === s.id ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-light)' } : {}}
+                className={`dash-student-pill${selectValue === s.id ? ' active' : ''}`}
+                style={selectValue === s.id ? { borderColor: 'var(--accent)', color: 'var(--accent)', background: 'var(--accent-light)' } : {}}
               >
                 {s.name}
-                {selectedId === s.id && (
-                  <span onClick={(e) => { e.stopPropagation(); setSelectedId(''); onSelectStudent(''); }} style={{ marginLeft: 4, cursor: 'pointer', opacity: .6 }}>×</span>
+                {selectValue === s.id && (
+                  <span onClick={(e) => { e.stopPropagation(); setSelectedId(''); }} style={{ marginLeft: 4, cursor: 'pointer', opacity: .6 }}>×</span>
                 )}
               </button>
             ))}
