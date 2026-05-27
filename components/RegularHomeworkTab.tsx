@@ -10,9 +10,10 @@ interface Props {
   toast: (msg: string) => void;
   onCopy: (text: string) => void;
   preSelectStudentId?: string;
+  preFillLinks?: { link1: string; link2: string; link3: string; studentName: string };
 }
 
-export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId }: Props) {
+export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillLinks }: Props) {
   const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [studentName, setStudentName] = useState('');
@@ -33,6 +34,15 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId }: Props)
       if (s) setStudentName(s.name);
     }
   }, [preSelectStudentId]);
+
+  useEffect(() => {
+    if (preFillLinks) {
+      if (preFillLinks.link1) setLink1(preFillLinks.link1);
+      if (preFillLinks.link2) setLink2(preFillLinks.link2);
+      if (preFillLinks.link3) setLink3(preFillLinks.link3);
+      if (preFillLinks.studentName) setStudentName(preFillLinks.studentName);
+    }
+  }, [preFillLinks]);
 
   const handleAddStudent = () => {
     if (!newStudentName.trim()) return;

@@ -9,8 +9,9 @@ import { RegularFeedbackTab } from '@/components/RegularFeedbackTab';
 import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
 import { StudentProfilesTab } from '@/components/StudentProfilesTab';
+import { ImportAssistantTab } from '@/components/ImportAssistantTab';
 
-type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'meeting' | 'students';
+type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'meeting' | 'students' | 'import';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -18,6 +19,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'regular-homework', label: '正课作业' },
   { id: 'meeting', label: '会议提醒' },
   { id: 'students', label: '学生档案' },
+  { id: 'import', label: '系统导入' },
 ];
 
 export default function HomePage() {
@@ -25,6 +27,9 @@ export default function HomePage() {
   const [toastMsg, setToastMsg] = useState('');
   const [userEmail, setUserEmail] = useState<string | null | 'loading'>('loading');
   const [pendingStudentId, setPendingStudentId] = useState('');
+  const [importFeedbackData, setImportFeedbackData] = useState('');
+  const [importFeedbackNotes, setImportFeedbackNotes] = useState('');
+  const [importHomeworkLinks, setImportHomeworkLinks] = useState({ link1: '', link2: '', link3: '', studentName: '' });
 
   useEffect(() => {
     let cancelled = false;
@@ -130,11 +135,11 @@ export default function HomePage() {
       </div>
 
       <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}>
-        <RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} />
+        <RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={importFeedbackData} preFillNotes={importFeedbackNotes} />
       </div>
 
       <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}>
-        <RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} />
+        <RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={importHomeworkLinks.link1 ? importHomeworkLinks : undefined} />
       </div>
 
       <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}>
@@ -143,6 +148,15 @@ export default function HomePage() {
 
       <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}>
         <StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} />
+      </div>
+
+      <div style={{ display: activeTab === 'import' ? 'block' : 'none' }}>
+        <ImportAssistantTab
+          toast={toast}
+          onFillFeedback={(data, notes) => { setImportFeedbackData(data); setImportFeedbackNotes(notes); }}
+          onFillHomework={(l1, l2, l3, name) => setImportHomeworkLinks({ link1: l1, link2: l2, link3: l3, studentName: name })}
+          onNavigate={(tab) => setActiveTab(tab as TabId)}
+        />
       </div>
 
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>

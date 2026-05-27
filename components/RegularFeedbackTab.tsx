@@ -22,9 +22,11 @@ import {
 interface Props {
   toast: (msg: string) => void;
   preSelectStudentId?: string;
+  preFillData?: string;
+  preFillNotes?: string;
 }
 
-export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
+export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, preFillNotes }: Props) {
   const [mounted, setMounted] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [addingStudent, setAddingStudent] = useState(false);
@@ -33,6 +35,8 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
 
   useEffect(() => { setMounted(true); setCustomPhrases(getCustomFeedbackPhrases()); }, []);
   useEffect(() => { if (preSelectStudentId) setSelectedStudentId(preSelectStudentId); }, [preSelectStudentId]);
+  useEffect(() => { if (preFillData) setClaudeResult(preFillData); }, [preFillData]);
+  useEffect(() => { if (preFillNotes) setNotes(preFillNotes); }, [preFillNotes]);
 
   const handleAddStudent = () => {
     if (!newStudentName.trim()) return;
