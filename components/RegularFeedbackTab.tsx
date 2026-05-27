@@ -116,6 +116,31 @@ export function RegularFeedbackTab({ toast, preSelectStudentId }: Props) {
     if (file) processFile(file);
   }, [processFile]);
 
+  // 全局粘贴监听：页面任意位置 Ctrl+V/⌘V 粘贴截图
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          e.preventDefault();
+          const file = items[i].getAsFile();
+          if (!file) return;
+          if (!['image/png', 'image/jpeg', 'image/jpg'].includes(file.type)) {
+            toast('仅支持 PNG/JPG 图片');
+            return;
+          }
+          processFile(file);
+          return;
+        }
+      }
+    };
+    document.addEventListener('paste', handler);
+    return () => document.removeEventListener('paste', handler);
+  }, [processFile, toast]);
+
   const clearImage = useCallback(() => {
     setImage(null);
     setImagePreview('');
@@ -666,7 +691,7 @@ function DropZone({
         ) : (
           <>
             <div className="drop-zone-icon">{dragOver ? '📂' : '📁'}</div>
-            <div className="drop-zone-text">点击上传、拖拽图片，或直接 Ctrl+V 粘贴截图</div>
+            <div className="drop-zone-text">点击上传、拖拽图片，或直接粘贴截图</div>
             <div className="drop-zone-hint">支持 PNG / JPG</div>
           </>
         )}
