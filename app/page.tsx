@@ -26,12 +26,17 @@ export default function HomePage() {
 
   // 检查登录状态
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserEmail(session?.user?.email || null);
+    const check = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUserEmail(session?.user?.email || null);
+      } catch {
+        setUserEmail(null);
+      }
       setAuthChecked(true);
-    });
+    };
+    check();
 
-    // 监听登录状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUserEmail(session?.user?.email || null);
     });
@@ -63,8 +68,19 @@ export default function HomePage() {
     [toast]
   );
 
-  // 未检查完登录状态时不显示
-  if (!authChecked) return null;
+  // 未检查完登录状态时显示加载
+  if (!authChecked) {
+    return (
+      <div className="auth-page">
+        <div className="auth-card">
+          <div className="auth-header">
+            <h1>Tutor 课后反馈生成器</h1>
+            <p>正在加载...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // 未登录显示登录/注册界面
   if (!userEmail) {
