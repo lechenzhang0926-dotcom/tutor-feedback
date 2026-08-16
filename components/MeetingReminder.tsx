@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { getStudents, getStudentById, saveStudent } from '@/lib/storage';
 import { incrementMeetingCount, incrementTotalMeetingCount, recordStudentUsage } from '@/lib/dashboardUtils';
+import { getMeetingIdText } from '@/lib/studentMeetingIds';
 import type { StudentProfile } from '@/lib/types';
 
 type MeetingType = 'regular' | 'anti-forgetting' | 'both';
@@ -140,7 +141,16 @@ export function MeetingReminder({ toast, onCopy, preSelectStudentId }: Props) {
               const v = e.target.value;
               setSelectedStudentId(v);
               if (v === '__temp__') { setShowTempName(true); setStudentName(''); }
-              else { setShowTempName(false); const s = getStudentById(v); if (s) setStudentName(s.name); }
+              else {
+                setShowTempName(false);
+                const s = getStudentById(v);
+                if (s) {
+                  setStudentName(s.name);
+                  // 自动填入会议号
+                  const mid = getMeetingIdText(s.name);
+                  if (mid) { setMeetingId(mid); }
+                }
+              }
             }}
             style={{ flex: 1, padding: '8px 12px', fontSize: '.88rem', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--card)', color: 'var(--text)', fontFamily: 'inherit' }}
           >

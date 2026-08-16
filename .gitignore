@@ -23,6 +23,9 @@ npm-debug.log*
 # vercel
 .vercel
 
+# playwright persistent browser profile
+.local-browser-profile
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

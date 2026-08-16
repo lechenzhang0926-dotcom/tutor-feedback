@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Tutor 课后反馈助手",
+  "version": "1.0",
+  "description": "读取智能英语系统页面数据，发送到 Tutor 课后反馈生成器",
+  "permissions": ["activeTab", "scripting", "tabs", "storage"],
+  "host_permissions": [
+    "https://test.hzdmsyy.com/*",
+    "http://localhost:3000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Tutor 课后反馈助手"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {}
+}

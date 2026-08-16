@@ -9,9 +9,17 @@ interface HomeworkMessageInput {
 }
 
 export function buildHomeworkMessage({ studentName, date, link1 }: HomeworkMessageInput): string {
-  const d = new Date(date);
-  const month = d.getMonth() + 1;
-  const day = d.getDate();
+  // Parse YYYY-MM-DD as Beijing date regardless of local timezone
+  const parts = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  let month: number, day: number;
+  if (parts) {
+    month = parseInt(parts[2], 10);
+    day = parseInt(parts[3], 10);
+  } else {
+    const d = new Date(date);
+    month = d.getMonth() + 1;
+    day = d.getDate();
+  }
   const dateStr = `${month}月${day}日`;
 
   return `🌸 ${studentName} ${dateStr} 作业 🌸

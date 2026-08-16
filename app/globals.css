@@ -123,6 +123,20 @@ body {
   gap: 8px;
   color: var(--text);
 }
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+  font-size: .75rem;
+  font-weight: 700;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
 
 /* ====== Form ====== */
 .field { margin-bottom: 16px; }

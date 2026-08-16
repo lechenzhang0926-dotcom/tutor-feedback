@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateFeedback } from '@/lib/deepseek';
+import { getBeijingDateText } from '@/lib/beijingTime';
 import {
   REGULAR_FEEDBACK_PROMPT,
   buildRegularFeedbackMessage,
@@ -74,10 +75,12 @@ export async function POST(request: NextRequest) {
     // 第二步：根据反馈类型用不同 prompt 生成
     const isAntiForgetting = feedbackType === 'anti-forgetting';
 
+    const beijingDateText = getBeijingDateText();
+
     const prompt = isAntiForgetting ? ANTI_FORGETTING_PROMPT : REGULAR_FEEDBACK_PROMPT;
     const userMessage = isAntiForgetting
-      ? buildAntiForgettingMessage(structuredData)
-      : buildRegularFeedbackMessage(structuredData, feedbackLength);
+      ? buildAntiForgettingMessage(structuredData, beijingDateText)
+      : buildRegularFeedbackMessage(structuredData, feedbackLength, beijingDateText);
 
     const feedback = await generateFeedback(prompt, userMessage, 0.82);
 

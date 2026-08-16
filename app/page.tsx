@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { AuthForm } from '@/components/AuthForm';
 import { UserMenu } from '@/components/UserMenu';
@@ -9,8 +9,9 @@ import { RegularFeedbackTab } from '@/components/RegularFeedbackTab';
 import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
 import { StudentProfilesTab } from '@/components/StudentProfilesTab';
-import { ImportAssistantTab } from '@/components/ImportAssistantTab';
-import { EnglishSystemGuide } from '@/components/EnglishSystemGuide';
+import { EnglishSystemGuide, type ImportFeedbackData, type ImportHomeworkData } from '@/components/EnglishSystemGuide';
+import { ExtensionImportListener } from '@/components/ExtensionImportListener';
+import { getStudents } from '@/lib/storage';
 
 type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'meeting' | 'students' | 'import';
 
@@ -20,41 +21,89 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'regular-homework', label: '正课作业' },
   { id: 'meeting', label: '会议提醒' },
   { id: 'students', label: '学生档案' },
-  { id: 'import', label: '系统导入' },
+  { id: 'import', label: '本地自动化' },
 ];
 
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [toastMsg, setToastMsg] = useState('');
-  const [userEmail, setUserEmail] = useState<string | null | 'loading'>('loading');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const gotSessionRef = useRef(false);
   const [pendingStudentId, setPendingStudentId] = useState('');
-  const [importFeedbackData, setImportFeedbackData] = useState('');
-  const [importFeedbackNotes, setImportFeedbackNotes] = useState('');
-  const [importHomeworkLinks, setImportHomeworkLinks] = useState({ link1: '', link2: '', link3: '', studentName: '' });
+  const [pendingFeedbackData, setPendingFeedbackData] = useState('');
+  const [pendingFeedbackNotes, setPendingFeedbackNotes] = useState('');
+  const [pendingHomeworkLinks, setPendingHomeworkLinks] = useState<{ link1?: string; link2?: string; link3?: string }>({});
 
   useEffect(() => {
     let cancelled = false;
-    const timeout = setTimeout(() => {
-      setUserEmail((prev) => (prev === 'loading' ? null : prev));
-    }, 3000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) { clearTimeout(timeout); setUserEmail(session?.user?.email || null); }
-    }).catch(() => {
-      if (!cancelled) { clearTimeout(timeout); setUserEmail(null); }
-    });
+      if (!cancelled && session?.user?.email) {
+        gotSessionRef.current = true;
+        setUserEmail(session.user.email);
+      }
+    }).catch(() => {});
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      clearTimeout(timeout);
+      if (cancelled) return;
+      if (!gotSessionRef.current && !session?.user?.email) return;
+      gotSessionRef.current = true;
       setUserEmail(session?.user?.email || null);
     });
 
-    return () => { cancelled = true; clearTimeout(timeout); subscription.unsubscribe(); };
+    return () => { cancelled = true; subscription.unsubscribe(); };
   }, []);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(''), 1800);
+  }, []);
+
+  const handleImport = useCallback((studentName?: string) => {
+    if (studentName) {
+      const students = getStudents();
+      const match = students.find(s => s.name === studentName);
+      if (match) setPendingStudentId(match.id);
+    }
+  }, []);
+
+  const handleImportToFeedback = useCallback((data: ImportFeedbackData) => {
+    setPendingFeedbackData(data.structuredData);
+    setPendingFeedbackNotes(data.notes);
+    handleImport(data.studentName);
+    setActiveTab('regular-feedback');
+    setTimeout(() => { setPendingFeedbackData(''); setPendingFeedbackNotes(''); }, 100);
+  }, [handleImport]);
+
+  const handleImportToHomework = useCallback((data: ImportHomeworkData) => {
+    setPendingHomeworkLinks({ link1: data.link1, link2: data.link2, link3: data.link3 });
+    handleImport(data.studentName);
+    setActiveTab('regular-homework');
+    setTimeout(() => { setPendingHomeworkLinks({}); }, 100);
+  }, [handleImport]);
+
+  const handleImportBoth = useCallback((feedbackData: ImportFeedbackData, homeworkData: ImportHomeworkData) => {
+    setPendingFeedbackData(feedbackData.structuredData);
+    setPendingFeedbackNotes(feedbackData.notes);
+    setPendingHomeworkLinks({ link1: homeworkData.link1, link2: homeworkData.link2, link3: homeworkData.link3 });
+    handleImport(feedbackData.studentName || homeworkData.studentName);
+    setActiveTab('regular-feedback');
+    setTimeout(() => { setPendingFeedbackData(''); setPendingFeedbackNotes(''); setPendingHomeworkLinks({}); }, 100);
+    toast('已同时填入课后反馈和正课作业');
+  }, [handleImport, toast]);
+
+  const handleImportStudentToFeedback = useCallback((studentName: string) => {
+    handleImport(studentName);
+    setActiveTab('regular-feedback');
+  }, [handleImport]);
+
+  const handleImportStudentToHomework = useCallback((studentName: string) => {
+    handleImport(studentName);
+    setActiveTab('regular-homework');
+  }, [handleImport]);
+
+  const handleSwitchToTab = useCallback((tabId: 'regular-feedback' | 'regular-homework') => {
+    setActiveTab(tabId);
   }, []);
 
   const handleCopy = useCallback(async (text: string) => {
@@ -73,17 +122,6 @@ export default function HomePage() {
     toast('已复制到剪贴板');
   }, [toast]);
 
-  if (userEmail === 'loading') {
-    return (
-      <div className="auth-page">
-        <div className="auth-card">
-          <div className="auth-header"><h1>Tutor 课后反馈生成器</h1></div>
-          <div className="auth-body" style={{ textAlign: 'center', color: 'var(--muted)', fontSize: '.88rem' }}>检查登录状态...</div>
-        </div>
-      </div>
-    );
-  }
-
   if (!userEmail) {
     return <AuthForm onLogin={() => { supabase.auth.getSession().then(({ data: { session } }) => { setUserEmail(session?.user?.email || null); }).catch(() => {}); }} />;
   }
@@ -91,6 +129,12 @@ export default function HomePage() {
   return (
     <div className="container">
       <UserMenu email={userEmail} onLogout={() => setUserEmail(null)} />
+      <ExtensionImportListener
+        toast={toast}
+        onImportToFeedback={handleImportStudentToFeedback}
+        onImportToHomework={handleImportStudentToHomework}
+        onSwitchToTab={handleSwitchToTab}
+      />
       <div className="header"><h1>Tutor 课后反馈生成器</h1><div className="sub">把课堂随记变成自然、得体的家长反馈</div></div>
 
       <div className="tab-nav">
@@ -100,19 +144,13 @@ export default function HomePage() {
       </div>
 
       <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}><DashboardTab onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
-      <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}><RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={importFeedbackData} preFillNotes={importFeedbackNotes} /></div>
-      <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}><RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={importHomeworkLinks.link1 ? importHomeworkLinks : undefined} /></div>
+      <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}><RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={pendingFeedbackData} preFillNotes={pendingFeedbackNotes} /></div>
+      <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}><RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={pendingHomeworkLinks.link1 ? pendingHomeworkLinks as { link1: string; link2: string; link3: string } : undefined} /></div>
       <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}><MeetingReminder toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} /></div>
       <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}><StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
 
       <div style={{ display: activeTab === 'import' ? 'block' : 'none' }}>
-        <ImportAssistantTab
-          toast={toast}
-          onFillFeedback={(data, notes) => { setImportFeedbackData(data); setImportFeedbackNotes(notes); }}
-          onFillHomework={(l1, l2, l3, name) => setImportHomeworkLinks({ link1: l1, link2: l2, link3: l3, studentName: name })}
-          onNavigate={(tab) => setActiveTab(tab as TabId)}
-        />
-        <EnglishSystemGuide toast={toast} />
+        <EnglishSystemGuide toast={toast} onImportToFeedback={handleImportToFeedback} onImportToHomework={handleImportToHomework} onImportBoth={handleImportBoth} />
       </div>
 
       <div className={`toast${toastMsg ? ' show' : ''}`}>{toastMsg}</div>

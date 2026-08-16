@@ -2,6 +2,8 @@
 // Dashboard 统计工具 — localStorage 读写
 // ============================================================
 
+import { getBeijingISODate } from './beijingTime';
+
 const ACTIVITY_KEY = 'tutor_daily_activity';
 const RECENT_STUDENTS_KEY = 'tutor_recent_students';
 
@@ -15,7 +17,7 @@ interface DailyActivity {
 export function getTodayActivity(): DailyActivity {
   if (typeof window === 'undefined') return { date: '', feedbackCount: 0, homeworkMsgCount: 0, meetingCount: 0 };
 
-  const today = beijingToday();
+  const today = getBeijingISODate();
   try {
     const raw = localStorage.getItem(ACTIVITY_KEY);
     const data: DailyActivity = raw ? JSON.parse(raw) : { date: '', feedbackCount: 0, homeworkMsgCount: 0, meetingCount: 0 };
@@ -31,21 +33,21 @@ export function getTodayActivity(): DailyActivity {
 export function incrementFeedbackCount(): void {
   const activity = getTodayActivity();
   activity.feedbackCount++;
-  activity.date = beijingToday();
+  activity.date = getBeijingISODate();
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity));
 }
 
 export function incrementHomeworkMsgCount(): void {
   const activity = getTodayActivity();
   activity.homeworkMsgCount++;
-  activity.date = beijingToday();
+  activity.date = getBeijingISODate();
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity));
 }
 
 export function incrementMeetingCount(): void {
   const activity = getTodayActivity();
   activity.meetingCount++;
-  activity.date = beijingToday();
+  activity.date = getBeijingISODate();
   localStorage.setItem(ACTIVITY_KEY, JSON.stringify(activity));
 }
 
@@ -96,9 +98,3 @@ export function incrementTotalFeedbackCount(): void { addTotalStat('feedbackCoun
 export function incrementTotalHomeworkCount(): void { addTotalStat('homeworkCount'); }
 export function incrementTotalMeetingCount(): void { addTotalStat('meetingCount'); }
 
-/** 获取今日北京时间的 YYYY-MM-DD */
-function beijingToday(): string {
-  const now = new Date();
-  const bj = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
-  return `${bj.getFullYear()}-${String(bj.getMonth() + 1).padStart(2, '0')}-${String(bj.getDate()).padStart(2, '0')}`;
-}

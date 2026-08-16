@@ -10,14 +10,9 @@ import {
   saveStudent,
 } from '@/lib/storage';
 import { updateProfileFromFeedback } from '@/lib/studentProfileUtils';
+import { getMeetingIdText } from '@/lib/studentMeetingIds';
 import type { StudentProfile, FeedbackRecord } from '@/lib/types';
 import { incrementFeedbackCount, incrementTotalFeedbackCount, recordStudentUsage } from '@/lib/dashboardUtils';
-import {
-  getDefaultFeedbackPhrases,
-  getCustomFeedbackPhrases,
-  deleteCustomPhrase,
-  updateCustomPhrasesFromUsage,
-} from '@/lib/feedbackPhraseUtils';
 
 interface Props {
   toast: (msg: string) => void;
@@ -33,10 +28,24 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
   const [newStudentName, setNewStudentName] = useState('');
   const [image, setImage] = useState<File | null>(null);
 
-  useEffect(() => { setMounted(true); setCustomPhrases(getCustomFeedbackPhrases()); }, []);
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => { if (preSelectStudentId) setSelectedStudentId(preSelectStudentId); }, [preSelectStudentId]);
-  useEffect(() => { if (preFillData) setClaudeResult(preFillData); }, [preFillData]);
-  useEffect(() => { if (preFillNotes) setNotes(preFillNotes); }, [preFillNotes]);
+
+  const preFillDataRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (preFillData && preFillData !== preFillDataRef.current) {
+      preFillDataRef.current = preFillData;
+      setClaudeResult(preFillData);
+    }
+  }, [preFillData]);
+
+  const preFillNotesRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (preFillNotes && preFillNotes !== preFillNotesRef.current) {
+      preFillNotesRef.current = preFillNotes;
+      setNotes(preFillNotes);
+    }
+  }, [preFillNotes]);
 
   const handleAddStudent = () => {
     if (!newStudentName.trim()) return;
@@ -56,9 +65,6 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
   const feedback = feedbackVersions[currentVersion] || '';
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
-  const [selectedPhrases, setSelectedPhrases] = useState<string[]>([]);
-  const [customPhrases, setCustomPhrases] = useState<string[]>([]);
-  const [phrasesExpanded, setPhrasesExpanded] = useState(false);
   const [error, setError] = useState('');
   const [remaining, setRemaining] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -152,55 +158,39 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
-  // --------------- 短语标签 ---------------
+  // --------------- 自动 OCR：图片上传后自动识别 ---------------
 
-  const togglePhrase = useCallback((phrase: string) => {
-    setSelectedPhrases((prev) => {
-      if (prev.includes(phrase)) {
-        return prev.filter((p) => p !== phrase);
+  const ocrTriggeredRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!compressedImage) return;
+    if (ocrTriggeredRef.current === compressedImage) return; // 同一张图已触发过
+    ocrTriggeredRef.current = compressedImage;
+
+    const doOcr = async () => {
+      setOcrLoading(true);
+      setError('');
+      try {
+        const res = await fetch('/api/ocr-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: compressedImage }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          toast(data.error || '图片识别失败，可以手动输入课后补充说明');
+          return;
+        }
+        setClaudeResult(data.text);
+        toast('已自动识别截图内容');
+      } catch {
+        toast('图片识别失败，可以手动输入课后补充说明');
+      } finally {
+        setOcrLoading(false);
       }
-      return [...prev, phrase];
-    });
-  }, []);
+    };
 
-  const handleDeleteCustom = useCallback((phrase: string) => {
-    deleteCustomPhrase(phrase);
-    setCustomPhrases(getCustomFeedbackPhrases());
-    setSelectedPhrases((prev) => prev.filter((p) => p !== phrase));
-  }, []);
-
-  // --------------- OCR 识别 ---------------
-
-  const handleOcr = useCallback(async () => {
-    if (!compressedImage) {
-      toast('请先上传截图');
-      return;
-    }
-
-    setOcrLoading(true);
-    setError('');
-
-    try {
-      const res = await fetch('/api/ocr-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64: compressedImage }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast(data.error || '识别失败');
-        return;
-      }
-
-      setClaudeResult(data.text);
-      toast('Claude 已识别截图内容，请在下方填写补充说明后点击生成');
-    } catch {
-      toast('识别失败，请检查网络');
-    } finally {
-      setOcrLoading(false);
-    }
+    doOcr();
   }, [compressedImage, toast]);
 
   // --------------- 生成 ---------------
@@ -231,7 +221,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
           feedbackLength,
           structuredData: claudeResult || undefined,
           notes: notes.trim() || undefined,
-          selectedPhrases: selectedPhrases.length > 0 ? selectedPhrases : undefined,
+          studentName: student?.name || undefined,
           studentProfile: student ? buildStudentContext(student) : undefined,
         }),
       });
@@ -254,11 +244,6 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
       incrementTotalFeedbackCount();
       if (selectedStudentId) recordStudentUsage(selectedStudentId);
 
-      // 更新个性化短语
-      if (selectedPhrases.length > 0 || notes.trim()) {
-        const updated = updateCustomPhrasesFromUsage(notes.trim(), selectedPhrases);
-        setCustomPhrases(updated);
-      }
       setRemaining(getRemainingToday());
 
       // 保存到学生反馈历史 + 自动积累档案
@@ -348,6 +333,19 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
             </select>
             <button className="btn btn-ghost" onClick={() => setAddingStudent(true)} style={{ whiteSpace: 'nowrap' }}>新增学生</button>
           </div>
+
+          {/* 自动显示会议号 */}
+          {selectedStudentId && mounted && (() => {
+            const student = getStudentById(selectedStudentId);
+            if (!student) return null;
+            const mid = getMeetingIdText(student.name);
+            if (!mid) return null;
+            return (
+              <div style={{ marginTop: 6, fontSize: '.82rem', color: '#6b5e53', display: 'flex', alignItems: 'center', gap: 4 }}>
+                📞 {mid}
+              </div>
+            );
+          })()}
         </div>
 
         {addingStudent && (
@@ -379,102 +377,30 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
             onFileSelect={handleImageChange}
             imagePreview={imagePreview}
             onClear={clearImage}
-            onOcr={handleOcr}
             ocrLoading={ocrLoading}
             fileInputRef={fileInputRef}
             toast={toast}
           />
         </div>
 
+        {/* OCR 识别中 / 识别结果 */}
+        {ocrLoading && (
+          <div style={{ marginBottom: 14, padding: '10px 14px', background: '#f5f0e8', borderRadius: 8, fontSize: '.84rem', color: '#8b7355', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span className="loading-dots"><span>.</span><span>.</span><span>.</span></span>
+            正在识别上课报告...
+          </div>
+        )}
+
         {claudeResult && (
           <div className="claude-preview">
-            <div className="claude-preview-label">Claude 已识别截图：</div>
+            <div className="claude-preview-label">已识别截图内容：</div>
             {claudeResult}
-          </div>
-        )}
-
-        {/* 常用反馈短语标签 */}
-        <div className="field">
-          <label>常用反馈短语</label>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {(phrasesExpanded ? getDefaultFeedbackPhrases() : getDefaultFeedbackPhrases().slice(0, 8)).map((phrase) => {
-              const active = selectedPhrases.includes(phrase);
-              return (
-                <button
-                  key={phrase}
-                  onClick={() => togglePhrase(phrase)}
-                  style={{
-                    fontSize: '.78rem',
-                    padding: '4px 12px',
-                    borderRadius: 16,
-                    border: active ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: active ? 'var(--accent)' : 'var(--card)',
-                    color: active ? '#fff' : 'var(--muted)',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    transition: 'all .15s',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {phrase}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => setPhrasesExpanded(!phrasesExpanded)}
-              style={{
-                fontSize: '.76rem', padding: '4px 12px', borderRadius: 16,
-                border: '1px dashed var(--border)', background: 'transparent',
-                color: 'var(--muted)', cursor: 'pointer', fontFamily: 'inherit',
-              }}
-            >
-              {phrasesExpanded ? '收起' : `展开更多 (${getDefaultFeedbackPhrases().length - 8})`}
-            </button>
-          </div>
-        </div>
-
-        {/* 已选择短语 */}
-        {selectedPhrases.length > 0 && (
-          <div style={{ marginBottom: 14, padding: '8px 12px', background: 'var(--accent-light)', borderRadius: 8, fontSize: '.78rem', color: 'var(--text)' }}>
-            已选择：{selectedPhrases.join('、')}
-          </div>
-        )}
-
-        {customPhrases.length > 0 && (
-          <div className="field">
-            <label>个性化短语 <span className="hint">（自动积累，双击可删除）</span></label>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {customPhrases.map((phrase) => {
-                const active = selectedPhrases.includes(phrase);
-                return (
-                  <button
-                    key={phrase}
-                    onClick={() => togglePhrase(phrase)}
-                    onDoubleClick={() => handleDeleteCustom(phrase)}
-                    style={{
-                      fontSize: '.78rem',
-                      padding: '4px 12px',
-                      borderRadius: 16,
-                      border: active ? '1px solid var(--accent)' : '1px dashed var(--border)',
-                      background: active ? 'var(--accent)' : 'var(--card)',
-                      color: active ? '#fff' : 'var(--muted)',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      transition: 'all .15s',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {phrase}
-                  </button>
-                );
-              })}
-            </div>
           </div>
         )}
 
         <div className="field">
           <label>
-            课后补充说明 <span className="hint">（选填，比如需要重点关注的单词等）</span>
+            课后补充说明 <span className="hint">（选填，比如需要重点关注的单词、遗忘词等）</span>
           </label>
           <textarea
             placeholder="例：记一下 boring 经常记不住这个单词，可以和 interesting 放在一起记。"
@@ -494,7 +420,7 @@ export function RegularFeedbackTab({ toast, preSelectStudentId, preFillData, pre
           </button>
           <button
             className="btn btn-ghost"
-            onClick={() => { setNotes(''); setSelectedPhrases([]); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); localStorage.removeItem(DRAFT_KEY); }}
+            onClick={() => { setNotes(''); setClaudeResult(''); setFeedbackVersions([]); setCurrentVersion(0); setError(''); clearImage(); ocrTriggeredRef.current = null; localStorage.removeItem(DRAFT_KEY); }}
           >
             清空
           </button>
@@ -616,7 +542,6 @@ function DropZone({
   onFileSelect,
   imagePreview,
   onClear,
-  onOcr,
   ocrLoading,
   fileInputRef,
   toast,
@@ -625,7 +550,6 @@ function DropZone({
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   imagePreview: string;
   onClear: () => void;
-  onOcr: () => void;
   ocrLoading: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   toast?: (msg: string) => void;
@@ -687,9 +611,11 @@ function DropZone({
               删除
             </button>
             <div className="drop-zone-actions">
-              <button onClick={(e) => { e.stopPropagation(); onOcr(); }} disabled={ocrLoading}>
-                {ocrLoading ? 'Claude 识别中...' : 'Claude 识别图片'}
-              </button>
+              {ocrLoading ? (
+                <span style={{ fontSize: '.78rem', color: '#8b7355' }}>正在识别上课报告...</span>
+              ) : (
+                <span style={{ fontSize: '.78rem', color: 'var(--success)' }}>上传成功，正在自动识别...</span>
+              )}
             </div>
           </div>
         ) : (

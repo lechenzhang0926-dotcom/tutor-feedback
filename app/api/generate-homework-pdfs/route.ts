@@ -28,7 +28,7 @@ const TMP_DIR = path.join(os.tmpdir(), 'tutor-pdfs');
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { studentName, date, link1, link2, link3 } = body;
+    const { studentName, date, link1, link2, link3, link4 } = body;
 
     // --------------- 校验 ---------------
 
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '请填写学生名字和日期' }, { status: 400 });
     }
 
-    if (!link1 && !link2 && !link3) {
+    if (!link1 && !link2 && !link3 && !link4) {
       return NextResponse.json({ error: '请至少填写一个作业链接' }, { status: 400 });
     }
 
@@ -74,6 +74,17 @@ export async function POST(request: NextRequest) {
       tasks.push({ name: `${prefix}-极简造句.pdf`, url: normalizeUrl(link3) });
     }
 
+    let syntaxPrintUrl = ''; // link4 的语法页面 URL
+    if (link4) {
+      const url = normalizeUrl(link4);
+      syntaxPrintUrl = url;
+      tasks.push(
+        { name: `${prefix}-例句.pdf`, url },
+        { name: `${prefix}-题目.pdf`, url },
+        { name: `${prefix}-解析.pdf`, url },
+      );
+    }
+
     // --------------- 创建临时目录 ---------------
 
     const sessionId = randomUUID();
@@ -86,7 +97,7 @@ export async function POST(request: NextRequest) {
       fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
     }, 10 * 60 * 1000);
 
-    // --------------- 生成 PDF ---------------
+    // --------------- 启动浏览器 ---------------
 
     let browser;
     try {
@@ -105,57 +116,136 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const files: FileInfo[] = [];
+    // --------------- 生成 PDF（并行优化） ---------------
+    //
+    // 优化策略：
+    // 1. PDF 直链 → 全部并行 fetch
+    // 2. Link1 页面 → 打开一次，循环切换版本生成 4 个 PDF（原来打开 4 次）
+    // 3. Link2 / Link3 → 各自独立页面，与上面两组并行
+    //
 
+    const files: FileInfo[] = [];
+    const parallelJobs: Promise<void>[] = [];
+
+    // --- 组 1: PDF 直链，全部并行 ---
     for (const task of tasks) {
-      let context;
-      try {
-        // PDF 直链：直接 fetch 下载
-        if (task.url.endsWith('.pdf')) {
+      if (!task.url.endsWith('.pdf')) continue;
+      parallelJobs.push((async () => {
+        try {
           const resp = await fetch(task.url);
           if (!resp.ok) throw new Error(`下载 PDF 失败 HTTP ${resp.status}`);
-          const arr = await resp.arrayBuffer();
-          const pdfBuffer = Buffer.from(arr);
+          const pdfBuffer = Buffer.from(await resp.arrayBuffer());
+          await fs.writeFile(path.join(sessionDir, task.name), pdfBuffer);
+          files.push({ name: task.name, size: pdfBuffer.length });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '未知错误';
+          console.error(`[generate-homework-pdfs] ${task.name} 失败:`, msg);
+          files.push({ name: task.name, size: 0, error: msg });
+        }
+      })());
+    }
+
+    // --- 组 2: Link1 页面打印（同一页面一次性生成 4 个版本） ---
+    if (pagePrintLink1) {
+      const link1Tasks = tasks.filter((t) => t.url === pagePrintLink1);
+      parallelJobs.push((async () => {
+        const context = await browser.newContext();
+        try {
+          const page = await context.newPage();
+          await page.goto(pagePrintLink1, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          // 等待 JS 渲染完毕
+          await page.waitForTimeout(800);
+
+          for (const task of link1Tasks) {
+            try {
+              const version = inferPrintVersion(task.name);
+              if (version) {
+                await clickPrintButton(page, version);
+              }
+              const pdfBuffer = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+              });
+              const filePath = path.join(sessionDir, task.name);
+              await fs.writeFile(filePath, pdfBuffer);
+              files.push({ name: task.name, size: pdfBuffer.length });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : '未知错误';
+              console.error(`[generate-homework-pdfs] ${task.name} 失败:`, msg);
+              files.push({ name: task.name, size: 0, error: msg });
+            }
+          }
+        } finally {
+          await context.close().catch(() => {});
+        }
+      })());
+    }
+
+    // --- 组 3: Link2 / Link3 独立页面，各自并行 ---
+    for (const task of tasks) {
+      if (task.url === pagePrintLink1 || task.url === syntaxPrintUrl || task.url.endsWith('.pdf')) continue;
+      parallelJobs.push((async () => {
+        const context = await browser.newContext();
+        try {
+          const page = await context.newPage();
+          await page.goto(task.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          await page.waitForTimeout(500);
+          const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+          });
           const filePath = path.join(sessionDir, task.name);
           await fs.writeFile(filePath, pdfBuffer);
           files.push({ name: task.name, size: pdfBuffer.length });
-          continue;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : '未知错误';
+          console.error(`[generate-homework-pdfs] ${task.name} 失败:`, msg);
+          files.push({ name: task.name, size: 0, error: msg });
+        } finally {
+          await context.close().catch(() => {});
         }
-
-        // 页面打印模式：Playwright 打开 + PDF
-        context = await browser.newContext();
-        const page = await context.newPage();
-
-        await page.goto(task.url, {
-          waitUntil: 'networkidle',
-          timeout: 30000,
-        });
-
-        const isLink1Task = pagePrintLink1 && task.url === pagePrintLink1;
-        if (isLink1Task) {
-          const version = inferPrintVersion(task.name);
-          if (version) {
-            await clickPrintButton(page, version);
-          }
-        }
-
-        const pdfBuffer = await page.pdf({
-          format: 'A4',
-          printBackground: true,
-          margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
-        });
-
-        const filePath = path.join(sessionDir, task.name);
-        await fs.writeFile(filePath, pdfBuffer);
-        files.push({ name: task.name, size: pdfBuffer.length });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : '未知错误';
-        console.error(`[generate-homework-pdfs] ${task.name} 生成失败:`, msg);
-        files.push({ name: task.name, size: 0, error: msg });
-      } finally {
-        if (context) await context.close().catch(() => {});
-      }
+      })());
     }
+
+    // --- 组 4: Link4 语法页面打印（同一页面生成例句/题目/解析 3个版本） ---
+    if (syntaxPrintUrl) {
+      const syntaxTasks = tasks.filter((t) => t.url === syntaxPrintUrl);
+      parallelJobs.push((async () => {
+        const context = await browser.newContext();
+        try {
+          const page = await context.newPage();
+          await page.goto(syntaxPrintUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+          await page.waitForTimeout(800);
+
+          for (const task of syntaxTasks) {
+            try {
+              const version = inferSyntaxVersion(task.name);
+              if (version) {
+                await clickPrintButton(page, version);
+              }
+              const pdfBuffer = await page.pdf({
+                format: 'A4',
+                printBackground: true,
+                margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+              });
+              const filePath = path.join(sessionDir, task.name);
+              await fs.writeFile(filePath, pdfBuffer);
+              files.push({ name: task.name, size: pdfBuffer.length });
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : '未知错误';
+              console.error(`[generate-homework-pdfs] ${task.name} 失败:`, msg);
+              files.push({ name: task.name, size: 0, error: msg });
+            }
+          }
+        } finally {
+          await context.close().catch(() => {});
+        }
+      })());
+    }
+
+    await Promise.all(parallelJobs);
 
     await browser.close();
 
@@ -197,6 +287,14 @@ function inferPrintVersion(fileName: string): string | null {
   if (fileName.includes('音标'))   return '音标';
   if (fileName.includes('英文'))   return '英文';
   if (fileName.includes('中文'))   return '中文';
+  return null;
+}
+
+function inferSyntaxVersion(fileName: string): string | null {
+  // 中英文版本（先点击的默认版本）不需要点按钮
+  if (fileName.includes('例句'))   return null;
+  if (fileName.includes('题目'))   return '题目';
+  if (fileName.includes('解析'))   return '解析';
   return null;
 }
 
