@@ -9,11 +9,19 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { randomUUID } from 'crypto';
-import { parseLink1Input, getPdfDirectTasks } from '@/lib/homeworkUtils';
+import {
+  parseLink1Input,
+  classifyAndNamePdfDirect,
+  assignName,
+  classifyFromTextAndUrl,
+  type HomeworkType,
+} from '@/lib/homeworkUtils';
 
 interface PdfTask {
   name: string;
   url: string;
+  /** PDF direct 模式已下载的内容，存在则直接写入，避免重复下载 */
+  buffer?: Buffer;
 }
 
 interface FileInfo {
@@ -49,11 +57,20 @@ export async function POST(request: NextRequest) {
     const prefix = `${studentName}-${date}`;
     const tasks: PdfTask[] = [];
     let pagePrintLink1 = ''; // link1 的页面打印 URL（仅 page 模式有值）
+    let link1Pages: string[] = []; // link1 的多个页面链接（每个单独识别命名生成）
+    const usedLink1 = new Map<HomeworkType, number>(); // 链接1 内命名去重（PDF 与页面链接共享）
 
     if (link1) {
       const parsed = parseLink1Input(link1);
-      if (parsed.mode === 'pdf-direct' && parsed.pdfUrls) {
-        tasks.push(...getPdfDirectTasks(prefix, parsed.pdfUrls));
+      if (parsed.mode === 'pdf-direct') {
+        // PDF 直链：按内容/链接识别每个 PDF 的类型，并给出正确文件名
+        if (parsed.pdfUrls && parsed.pdfUrls.length) {
+          tasks.push(...(await classifyAndNamePdfDirect(prefix, parsed.pdfUrls, usedLink1)));
+        }
+        // 多个页面链接：收集起来稍后用浏览器逐个识别、各生成 1 份 PDF
+        if (parsed.pageUrls && parsed.pageUrls.length) {
+          link1Pages = parsed.pageUrls.map((u) => normalizeUrl(u));
+        }
       } else if (parsed.mode === 'page' && parsed.pageUrl) {
         const pageUrl = normalizeUrl(parsed.pageUrl);
         pagePrintLink1 = pageUrl;
@@ -132,9 +149,12 @@ export async function POST(request: NextRequest) {
       if (!task.url.endsWith('.pdf')) continue;
       parallelJobs.push((async () => {
         try {
-          const resp = await fetch(task.url);
-          if (!resp.ok) throw new Error(`下载 PDF 失败 HTTP ${resp.status}`);
-          const pdfBuffer = Buffer.from(await resp.arrayBuffer());
+          let pdfBuffer = task.buffer;
+          if (!pdfBuffer) {
+            const resp = await fetch(task.url);
+            if (!resp.ok) throw new Error(`下载 PDF 失败 HTTP ${resp.status}`);
+            pdfBuffer = Buffer.from(await resp.arrayBuffer());
+          }
           await fs.writeFile(path.join(sessionDir, task.name), pdfBuffer);
           files.push({ name: task.name, size: pdfBuffer.length });
         } catch (err) {
@@ -180,6 +200,40 @@ export async function POST(request: NextRequest) {
           await context.close().catch(() => {});
         }
       })());
+    }
+
+    // --- 组 2.5: 课后作业1 的多个页面链接，每个单独识别命名、生成 1 份 PDF ---
+    if (link1Pages.length > 0) {
+      for (let i = 0; i < link1Pages.length; i++) {
+        const pageUrl = link1Pages[i];
+        parallelJobs.push((async () => {
+          const context = await browser.newContext();
+          try {
+            const page = await context.newPage();
+            await page.goto(pageUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForTimeout(500);
+            // 综合 URL / 页面标题 / 正文识别类型，给出正确文件名
+            const title = await page.title().catch(() => '');
+            const bodyText = await page.innerText('body').catch(() => '');
+            const type = classifyFromTextAndUrl(pageUrl, title, bodyText);
+            const name = assignName(prefix, type, usedLink1, i);
+            const pdfBuffer = await page.pdf({
+              format: 'A4',
+              printBackground: true,
+              margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+            });
+            const filePath = path.join(sessionDir, name);
+            await fs.writeFile(filePath, pdfBuffer);
+            files.push({ name, size: pdfBuffer.length });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : '未知错误';
+            console.error(`[generate-homework-pdfs] 课后作业1页面 ${pageUrl} 失败:`, msg);
+            files.push({ name: `${prefix}-文件${i + 1}.pdf`, size: 0, error: msg });
+          } finally {
+            await context.close().catch(() => {});
+          }
+        })());
+      }
     }
 
     // --- 组 3: Link2 / Link3 独立页面，各自并行 ---

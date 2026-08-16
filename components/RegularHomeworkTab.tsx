@@ -499,7 +499,7 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
         </div>
 
         <div className="field">
-          <label>课后作业 1 链接 <span className="hint">（可输入一个打印页面链接，或粘贴多个 PDF 直链，换行分隔）</span></label>
+          <label>课后作业 1 链接 <span className="hint">（可输入一个打印页面链接，自动生成中英文/英文/中文/音标 4 份；或粘贴多个 PDF / 页面链接（换行分隔），系统会自动识别每个链接属于「英文/中文/中英文/音标」并正确命名）</span></label>
           <textarea
             placeholder="https://test.hzdmsyy.com/pc/prints?id=247343&#10;&#10;或粘贴多个 PDF 直链：&#10;https://fqyy.zzfq888.com/uploads/pdf/xxx.pdf&#10;https://fqyy.zzfq888.com/uploads/pdf/yyy.pdf&#10;https://fqyy.zzfq888.com/uploads/pdf/zzz.pdf"
             value={link1}

@@ -7,18 +7,20 @@ import { UserMenu } from '@/components/UserMenu';
 import { DashboardTab } from '@/components/DashboardTab';
 import { RegularFeedbackTab } from '@/components/RegularFeedbackTab';
 import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
+import { BatchHomeworkTab } from '@/components/BatchHomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
 import { StudentProfilesTab } from '@/components/StudentProfilesTab';
 import { EnglishSystemGuide, type ImportFeedbackData, type ImportHomeworkData } from '@/components/EnglishSystemGuide';
 import { ExtensionImportListener } from '@/components/ExtensionImportListener';
 import { getStudents } from '@/lib/storage';
 
-type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'meeting' | 'students' | 'import';
+type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'batch-homework' | 'meeting' | 'students' | 'import';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'regular-feedback', label: '课后反馈' },
   { id: 'regular-homework', label: '正课作业' },
+  { id: 'batch-homework', label: '批量作业' },
   { id: 'meeting', label: '会议提醒' },
   { id: 'students', label: '学生档案' },
   { id: 'import', label: '本地自动化' },
@@ -146,6 +148,7 @@ export default function HomePage() {
       <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}><DashboardTab onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
       <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}><RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={pendingFeedbackData} preFillNotes={pendingFeedbackNotes} /></div>
       <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}><RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={pendingHomeworkLinks.link1 ? pendingHomeworkLinks as { link1: string; link2: string; link3: string } : undefined} /></div>
+      <div style={{ display: activeTab === 'batch-homework' ? 'block' : 'none' }}><BatchHomeworkTab toast={toast} onCopy={handleCopy} /></div>
       <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}><MeetingReminder toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} /></div>
       <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}><StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
 
