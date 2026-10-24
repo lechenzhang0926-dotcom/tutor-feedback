@@ -10,7 +10,7 @@ interface Props {
 
 export function UserMenu({ email, onLogout }: Props) {
   const handleLogout = useCallback(async () => {
-    await supabase.auth.signOut();
+    try { await supabase?.auth.signOut(); } catch { /* 忽略登出失败 */ }
     onLogout();
   }, [onLogout]);
 

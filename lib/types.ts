@@ -79,6 +79,12 @@ export interface FeedbackRecord {
 export interface StudentProfile {
   id: string;
   name: string;
+  /**
+   * 学生编号：来自作业链接里的数字（如 .../pc/prints?id=247343 的 247343）。
+   * 编号由系统分配、不会变动，比学生名更可靠 —— 识别学生时优先用编号。
+   * 首次识别到后自动记住，下次遇到同一编号即可直接对应到该学生。
+   */
+  studentNo?: string;
   /** 自动积累：教材/词库 */
   textbook?: string;
   /** 自动积累：常忘单词 */

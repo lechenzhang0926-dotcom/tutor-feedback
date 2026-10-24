@@ -835,6 +835,126 @@ body::before {
   body::before { background-image: radial-gradient(circle, #5a4a3a 0.5px, transparent 0.5px); opacity: 0.18; }
 }
 
+/* ====== Homework UI Upgrade (A/B/C) ====== */
+/* A · 分段切换器（修复原 var(--primary) 无效变量的隐患） */
+.hw-seg {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.hw-seg button {
+  padding: 6px 18px;
+  font-size: .84rem;
+  border: none;
+  cursor: pointer;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  transition: all .15s;
+}
+.hw-seg button:hover { background: var(--tag-bg); }
+.hw-seg button.active { background: var(--accent); color: #fff; }
+
+/* B · 分组预览卡片 */
+.hw-group-list { display: flex; flex-direction: column; gap: 12px; }
+.hw-group-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.hw-group-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hw-group-idx { font-weight: 600; color: var(--muted); }
+.hw-name-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: .88rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+}
+.hw-name-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(192,130,74,.12); }
+.hw-name-input.pending { border-color: var(--danger); }
+.hw-pending-badge {
+  font-size: .7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fef0f0;
+  color: var(--danger);
+  white-space: nowrap;
+}
+.hw-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.hw-chip {
+  font-size: .72rem;
+  padding: 3px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+.hw-chip.filled { background: var(--accent-light); color: var(--accent); border-color: rgba(192,130,74,.3); }
+.hw-chip.empty { background: var(--tag-bg); color: var(--muted); }
+
+/* C · 生成结果：紧凑列表 + 进度条 */
+.hw-progress-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.hw-progress-track { flex: 1; height: 6px; background: var(--tag-bg); border-radius: 4px; overflow: hidden; }
+.hw-progress-fill { height: 100%; background: var(--accent); transition: width .3s ease; }
+.hw-progress-label { font-size: .76rem; color: var(--muted); white-space: nowrap; }
+
+.hw-result-list { display: flex; flex-direction: column; gap: 8px; }
+.hw-result-row { border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; background: var(--card); }
+.hw-result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+.hw-result-head:hover { background: var(--tag-bg); }
+.hw-result-idx {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--accent-light);
+  color: var(--accent);
+  font-size: .72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hw-result-name { font-weight: 600; font-size: .9rem; }
+.hw-result-note { font-size: .74rem; color: var(--muted); margin-left: 6px; }
+.hw-result-meta { font-size: .74rem; color: var(--muted); margin-left: auto; margin-right: 4px; white-space: nowrap; }
+.hw-result-chevron { color: var(--muted); font-size: .8rem; transition: transform .2s; }
+.hw-result-row.open .hw-result-chevron { transform: rotate(90deg); }
+.hw-result-detail { padding: 0 14px 12px; border-top: 1px solid var(--border); }
+
+.hw-status { font-size: .72rem; padding: 2px 9px; border-radius: 10px; white-space: nowrap; }
+.hw-status.pending { background: var(--tag-bg); color: var(--muted); }
+.hw-status.generating { background: var(--accent-light); color: var(--accent); }
+.hw-status.done { background: #edf7f0; color: var(--success); }
+.hw-status.error { background: #fef0f0; color: var(--danger); }
+
+.hw-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: hw-spin .7s linear infinite;
+  display: inline-block;
+}
+@keyframes hw-spin { to { transform: rotate(360deg); } }
+
+/* A · 粘贴大文本框统一高度 */
+.hw-paste { min-height: 280px; }
+
+
 @media (max-width: 640px) {
   .bg-blob-1 { width: 200px; height: 200px; top: -60px; right: -60px; }
   .bg-blob-2 { width: 150px; height: 150px; bottom: -30px; left: -40px; }

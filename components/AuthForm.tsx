@@ -16,6 +16,10 @@ export function AuthForm({ onLogin }: Props) {
   const [isRegister, setIsRegister] = useState(false);
 
   const handleSubmit = useCallback(async () => {
+    if (!supabase) {
+      setError('登录服务未配置');
+      return;
+    }
     if (!email.trim() || !password.trim()) {
       setError('请填写邮箱和密码');
       return;
@@ -41,7 +45,7 @@ export function AuthForm({ onLogin }: Props) {
 
         if (!keepLoggedIn) {
           window.addEventListener('beforeunload', () => {
-            supabase.auth.signOut();
+            void supabase!.auth.signOut();
           });
         }
 

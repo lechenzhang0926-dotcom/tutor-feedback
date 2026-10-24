@@ -93,9 +93,22 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
       setShowDetectedPrompt(false);
       setShowFuzzyPrompt(false);
     } else if (fuzzy) {
-      setFuzzyMatchStudent(fuzzy);
-      setShowFuzzyPrompt(true);
-      setShowDetectedPrompt(false);
+      const detectedLower = name.trim().toLowerCase();
+      const archiveLower = fuzzy.name.trim().toLowerCase();
+      // 高置信：文档里的全名包含档案里的短名（如 龚浩博 ⊃ 浩博）。
+      // 说明是同一人（文档印了带姓全名、档案存了昵称），直接对应档案名，
+      // 无需手动确认 —— 即「识别到 ABC，档案里有 BC，直接用 BC」。
+      const highConfidence = archiveLower.length >= 2 && detectedLower.includes(archiveLower);
+      if (highConfidence) {
+        setSelectedStudentId(fuzzy.id);
+        setStudentName(fuzzy.name);
+        setShowDetectedPrompt(false);
+        setShowFuzzyPrompt(false);
+      } else {
+        setFuzzyMatchStudent(fuzzy);
+        setShowFuzzyPrompt(true);
+        setShowDetectedPrompt(false);
+      }
     } else {
       setEditingDetectedName(name);
       setShowDetectedPrompt(true);

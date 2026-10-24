@@ -110,8 +110,8 @@ export function DashboardTab({ onNavigate, onSelectStudent }: Props) {
           <button className="btn btn-primary" onClick={() => handleAction('regular-feedback')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
             生成课后反馈
           </button>
-          <button className="btn btn-primary" onClick={() => handleAction('regular-homework')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
-            制作正课作业
+          <button className="btn btn-primary" onClick={() => handleAction('homework')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
+            制作作业
           </button>
           <button className="btn btn-primary" onClick={() => handleAction('meeting')} style={{ flex: 1, minWidth: 140, justifyContent: 'center' }}>
             生成会议提醒

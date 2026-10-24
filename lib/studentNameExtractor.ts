@@ -3,6 +3,9 @@
 // 供 /api/extract-student-name（单名）与 /api/extract-student-names（批量）复用。
 // ============================================================
 
+// 用 homeworkUtils 的 flate 解密文本抽取，覆盖压缩 PDF 流（朴素 UTF-8 解码抽不到）
+import { extractPdfText } from '@/lib/homeworkUtils';
+
 export async function extractNameFromUrl(url: string): Promise<string> {
   // ---- PDF 文件 ----
   if (/\.pdf(\?.*)?$/i.test(url)) {
@@ -14,6 +17,28 @@ export async function extractNameFromUrl(url: string): Promise<string> {
     return extractNameFromHtml(url);
   }
 
+  return '';
+}
+
+// ============================================================
+// 从「已解密的 PDF 纯文本」中识别学生名字（高置信）
+// 优先「姓名：」(文档正文常见标签)，其次「学生：/学员：」；
+// 一律按强匹配处理（文档里出现这些标签基本就是学生名）。
+// ============================================================
+function matchNameFromPdfText(text: string): string {
+  const labelPatterns = [
+    /姓名\s*[：:]\s*([一-鿿]{2,5})/,
+    /学员\s*[：:]\s*([一-鿿]{2,5})/,
+    /学生\s*[：:]\s*([一-鿿]{2,5})/,
+    /名字\s*[：:]\s*([一-鿿]{2,5})/,
+  ];
+  for (const pat of labelPatterns) {
+    const m = text.match(pat);
+    if (m) {
+      const candidate = cleanNameCandidate(m[1]);
+      if (candidate && isLikelyName(candidate, true)) return candidate;
+    }
+  }
   return '';
 }
 
@@ -44,7 +69,7 @@ async function extractNameFromHtml(url: string): Promise<string> {
 }
 
 // ============================================================
-// 从 PDF 提取学生名字（读取文本 + URL 文件名）
+// 从 PDF 提取学生名字（flate 解密文本 + URL 文件名）
 // ============================================================
 async function extractNameFromPdf(url: string): Promise<string> {
   // 先尝试从文件名提取
@@ -53,7 +78,7 @@ async function extractNameFromPdf(url: string): Promise<string> {
   const fromFileName = cleanNameCandidate(decodedName);
   if (fromFileName && isLikelyName(fromFileName)) return fromFileName;
 
-  // 尝试下载 PDF 并提取文本
+  // 下载 PDF，优先用 flate 解密提取纯文本（覆盖压缩流），按「姓名：」等标签强匹配
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
@@ -69,10 +94,19 @@ async function extractNameFromPdf(url: string): Promise<string> {
 
     if (!resp.ok) return '';
 
-    const buffer = await resp.arrayBuffer();
-    const text = new TextDecoder('utf-8').decode(buffer);
+    const buffer = Buffer.from(await resp.arrayBuffer());
 
-    return extractNameFromText(text);
+    // 1) 主路径：flate 解密后的 PDF 文本 → 按标签强匹配（最稳，能处理压缩流）
+    const pdfText = extractPdfText(buffer);
+    const fromPdf = matchNameFromPdfText(pdfText);
+    if (fromPdf) return fromPdf;
+
+    // 2) 兜底：朴素 UTF-8 解码（极少数未压缩 PDF）
+    const naive = buffer.toString('utf-8');
+    const fromNaive = matchNameFromPdfText(naive);
+    if (fromNaive) return fromNaive;
+
+    return '';
   } catch {
     return '';
   }

@@ -164,13 +164,43 @@ function unescapePdfString(s: string): string {
     .replace(/\\(\d{1,3})/g, (_, d) => String.fromCharCode(parseInt(d, 8) || 32));
 }
 
+/**
+ * 解码 Tj/TJ 中的一段字符串。
+ * - 自定义中文字体（Identity-H + ToUnicode 恒等映射）下，字符串是 2 字节 UTF-16BE，
+ *   CID 即 Unicode 码点，需按 UTF-16BE 解码才能还原中文。
+ * - 普通拉丁 PDF 按 latin1（原行为）解码。
+ * 启发式：若按 UTF-16BE 解出中文字符或常见中文标点，则采用之；否则回退 latin1。
+ */
+function decodePdfString(s: string): string {
+  const un = unescapePdfString(s);
+  // 偶数长度才可能是 2 字节编码
+  if (un.length >= 2 && un.length % 2 === 0) {
+    let cjk = 0;
+    let cjkPunct = 0;
+    for (let i = 0; i + 1 < un.length; i += 2) {
+      const code = (un.charCodeAt(i) << 8) | un.charCodeAt(i + 1);
+      if (code >= 0x4e00 && code <= 0x9fff) cjk++;
+      else if ((code >= 0x3000 && code <= 0x303f) || (code >= 0xff00 && code <= 0xffef)) cjkPunct++;
+    }
+    if (cjk > 0 || cjkPunct > 0) {
+      let out = '';
+      for (let i = 0; i + 1 < un.length; i += 2) {
+        const code = (un.charCodeAt(i) << 8) | un.charCodeAt(i + 1);
+        if (code !== 0) out += String.fromCharCode(code);
+      }
+      return out;
+    }
+  }
+  return un;
+}
+
 function extractTextFromContent(s: string): string {
   let txt = '';
   let m: RegExpExecArray | null;
 
   // (...) Tj —— 普通文本
   const parenRe = /\(((?:\\.|[^\\()])*)\)\s*Tj/g;
-  while ((m = parenRe.exec(s))) txt += unescapePdfString(m[1]) + ' ';
+  while ((m = parenRe.exec(s))) txt += decodePdfString(m[1]) + ' ';
 
   // [ (..) (..) ] TJ —— 文本数组
   const tjRe = /\[([\s\S]*?)\]\s*TJ/g;
@@ -178,7 +208,7 @@ function extractTextFromContent(s: string): string {
     const inner = m[1];
     const pm = /\(((?:\\.|[^\\()])*)\)/g;
     let mm: RegExpExecArray | null;
-    while ((mm = pm.exec(inner))) txt += unescapePdfString(mm[1]) + ' ';
+    while ((mm = pm.exec(inner))) txt += decodePdfString(mm[1]) + ' ';
   }
 
   // <hex> Tj —— 十六进制文本

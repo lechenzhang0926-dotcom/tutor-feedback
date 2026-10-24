@@ -1,8 +1,29 @@
 // ============================================================
-// 客户端存储工具 — 仅客户端（依赖 localStorage）
+// 客户端存储工具 — 仍以 localStorage 为「工作缓存」（同步 API，组件不动）
+//
+// 多用户改造说明：
+// 本文件保持原有同步函数签名不变；每次写入 localStorage 后，额外把改动
+// 「后台镜像」到 Supabase（见 lib/cloudSync.ts），并按 user_id 隔离。
+// 登录时由 cloudSync.seedFromSupabase 把云端数据拉回 localStorage。
+//
+// 未配置 Supabase（环境变量缺失）时：镜像函数为 no-op，纯本地模式，行为同改造前。
 // ============================================================
 
-import { FeedbackRecord, StudentProfile, STORAGE_KEYS, MAX_DAILY_GENERATIONS, MAX_STUDENT_FEEDBACKS } from './types';
+import {
+  FeedbackRecord,
+  StudentProfile,
+  STORAGE_KEYS,
+  MAX_DAILY_GENERATIONS,
+  MAX_STUDENT_FEEDBACKS,
+} from './types';
+import {
+  mirrorAddFeedback,
+  mirrorAddHistory,
+  mirrorDaily,
+  mirrorDeleteHistory,
+  mirrorDeleteStudent,
+  mirrorUpsertStudent,
+} from './cloudSync';
 
 // --------------- 每日次数限制 ---------------
 
@@ -24,6 +45,8 @@ export function getDailyCount(): number {
 export function incrementDailyCount(): number {
   const count = getDailyCount() + 1;
   localStorage.setItem(STORAGE_KEYS.dailyCount, String(count));
+  // 后台镜像到云端（未配置 Supabase 时 no-op）
+  void mirrorDaily(count).catch(() => {});
   return count;
 }
 
@@ -58,6 +81,7 @@ export function saveToHistory(record: FeedbackRecord): void {
   }
 
   localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history));
+  void mirrorAddHistory(record).catch(() => {});
 }
 
 export function deleteFromHistory(id: string): void {
@@ -65,6 +89,7 @@ export function deleteFromHistory(id: string): void {
 
   const history = getHistory().filter((r) => r.id !== id);
   localStorage.setItem(STORAGE_KEYS.history, JSON.stringify(history));
+  void mirrorDeleteHistory(id).catch(() => {});
 }
 
 // --------------- 学生档案 ---------------
@@ -100,6 +125,7 @@ export function saveStudent(student: StudentProfile): void {
   }
 
   localStorage.setItem(STORAGE_KEYS.students, JSON.stringify(students));
+  void mirrorUpsertStudent(student).catch(() => {});
 }
 
 export function deleteStudent(id: string): void {
@@ -107,6 +133,7 @@ export function deleteStudent(id: string): void {
 
   const students = getStudents().filter((s) => s.id !== id);
   localStorage.setItem(STORAGE_KEYS.students, JSON.stringify(students));
+  void mirrorDeleteStudent(id).catch(() => {});
 }
 
 export function getStudentById(id: string): StudentProfile | undefined {
@@ -127,4 +154,5 @@ export function addFeedbackToStudent(studentId: string, record: FeedbackRecord):
 
   student.updatedAt = new Date().toISOString();
   localStorage.setItem(STORAGE_KEYS.students, JSON.stringify(students));
+  void mirrorAddFeedback(studentId, student.recentFeedbacks).catch(() => {});
 }

@@ -5,6 +5,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from 'next/server';
+import type { Browser } from 'playwright';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs/promises';
@@ -32,6 +33,45 @@ interface FileInfo {
 
 // 临时文件目录
 const TMP_DIR = path.join(os.tmpdir(), 'tutor-pdfs');
+
+// ============================================================
+// 浏览器单例（关键优化）
+//
+// 之前每收到一次生成请求都 chromium.launch 一个新浏览器、用完即 close。
+// 批量作业时是「每个学生一次请求」，于是每个学生都会新开 + 关闭一个 Chromium，
+// 在 Windows 上反复启停会闪出控制台/窗口，而且很慢。
+//
+// 改为：整个服务只按需启动一个浏览器实例，之后所有生成（含所有学生）共用，
+// 不再每个学生新开。每个请求仍用独立的 browser.newContext()（隔离 cookie/缓存），
+// 所以学生之间不会互相串数据。浏览器若意外断开会自动失效、下次请求重建。
+// ============================================================
+let cachedBrowser: Browser | null = null;
+let browserLaunching: Promise<Browser> | null = null;
+
+async function getSharedBrowser(): Promise<Browser> {
+  if (cachedBrowser && cachedBrowser.isConnected()) return cachedBrowser;
+  // 并发请求同时进来时，只让第一个去启动，其余复用同一个 Promise，避免开多个浏览器
+  if (browserLaunching) return browserLaunching;
+  browserLaunching = (async () => {
+    const { chromium } = await import('playwright');
+    const b = await chromium.launch({
+      headless: true,
+      // --no-sandbox / --disable-setuid-sandbox：兼容 Linux/容器部署；Windows 上无副作用
+      // --disable-gpu / --disable-dev-shm-usage：无头环境下更稳定，避免偶发崩溃
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu', '--disable-dev-shm-usage'],
+    });
+    cachedBrowser = b;
+    b.on('disconnected', () => {
+      cachedBrowser = null;
+    });
+    return b;
+  })();
+  try {
+    return await browserLaunching;
+  } finally {
+    browserLaunching = null;
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -114,15 +154,11 @@ export async function POST(request: NextRequest) {
       fs.rm(sessionDir, { recursive: true, force: true }).catch(() => {});
     }, 10 * 60 * 1000);
 
-    // --------------- 启动浏览器 ---------------
+    // --------------- 获取浏览器（复用单例，避免每个学生都新开一个 Chromium 而闪出窗口）---------------
 
-    let browser;
+    let browser: Browser;
     try {
-      const { chromium } = await import('playwright');
-      browser = await chromium.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      });
+      browser = await getSharedBrowser();
     } catch (err) {
       const msg = err instanceof Error ? err.message : '未知错误';
       console.error('[generate-homework-pdfs] Playwright 启动失败:', msg);
@@ -301,7 +337,7 @@ export async function POST(request: NextRequest) {
 
     await Promise.all(parallelJobs);
 
-    await browser.close();
+    // 注意：浏览器是服务级单例，这里不再 close，留给后续请求复用（进程退出时由 OS 回收）
 
     // 检查是否有成功的
     const successCount = files.filter((f) => !f.error).length;

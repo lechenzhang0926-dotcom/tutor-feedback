@@ -1,26 +1,25 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, isAuthConfigured } from '@/lib/supabaseClient';
+import { seedFromSupabase, clearLocalData } from '@/lib/cloudSync';
 import { AuthForm } from '@/components/AuthForm';
 import { UserMenu } from '@/components/UserMenu';
 import { DashboardTab } from '@/components/DashboardTab';
 import { RegularFeedbackTab } from '@/components/RegularFeedbackTab';
-import { RegularHomeworkTab } from '@/components/RegularHomeworkTab';
-import { BatchHomeworkTab } from '@/components/BatchHomeworkTab';
+import { HomeworkTab } from '@/components/HomeworkTab';
 import { MeetingReminder } from '@/components/MeetingReminder';
 import { StudentProfilesTab } from '@/components/StudentProfilesTab';
 import { EnglishSystemGuide, type ImportFeedbackData, type ImportHomeworkData } from '@/components/EnglishSystemGuide';
 import { ExtensionImportListener } from '@/components/ExtensionImportListener';
 import { getStudents } from '@/lib/storage';
 
-type TabId = 'dashboard' | 'regular-feedback' | 'regular-homework' | 'batch-homework' | 'meeting' | 'students' | 'import';
+type TabId = 'dashboard' | 'regular-feedback' | 'homework' | 'meeting' | 'students' | 'import';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'regular-feedback', label: '课后反馈' },
-  { id: 'regular-homework', label: '正课作业' },
-  { id: 'batch-homework', label: '批量作业' },
+  { id: 'homework', label: '作业' },
   { id: 'meeting', label: '会议提醒' },
   { id: 'students', label: '学生档案' },
   { id: 'import', label: '本地自动化' },
@@ -30,31 +29,57 @@ export default function HomePage() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [toastMsg, setToastMsg] = useState('');
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
   const gotSessionRef = useRef(false);
   const [pendingStudentId, setPendingStudentId] = useState('');
   const [pendingFeedbackData, setPendingFeedbackData] = useState('');
   const [pendingFeedbackNotes, setPendingFeedbackNotes] = useState('');
   const [pendingHomeworkLinks, setPendingHomeworkLinks] = useState<{ link1?: string; link2?: string; link3?: string }>({});
 
+  const ensureSeededThenSetEmail = useCallback(async (email: string) => {
+    if (!isAuthConfigured) {
+      setUserEmail(email);
+      return;
+    }
+    setSeeding(true);
+    try {
+      await seedFromSupabase();
+    } catch {
+      // 云端拉取失败也不阻塞使用，继续用本地数据
+    } finally {
+      setSeeding(false);
+      setUserEmail(email);
+    }
+  }, []);
+
   useEffect(() => {
+    if (!isAuthConfigured) {
+      // 本地模式：不要求登录，直接进入应用
+      setUserEmail('local');
+      return;
+    }
     let cancelled = false;
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase!.auth.getSession().then(({ data: { session } }) => {
       if (!cancelled && session?.user?.email) {
         gotSessionRef.current = true;
-        setUserEmail(session.user.email);
+        void ensureSeededThenSetEmail(session.user.email);
       }
     }).catch(() => {});
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange((_event, session) => {
       if (cancelled) return;
       if (!gotSessionRef.current && !session?.user?.email) return;
       gotSessionRef.current = true;
-      setUserEmail(session?.user?.email || null);
+      if (session?.user?.email) {
+        void ensureSeededThenSetEmail(session.user.email);
+      } else {
+        void clearLocalData().then(() => setUserEmail(null));
+      }
     });
 
     return () => { cancelled = true; subscription.unsubscribe(); };
-  }, []);
+  }, [ensureSeededThenSetEmail]);
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg);
@@ -80,7 +105,7 @@ export default function HomePage() {
   const handleImportToHomework = useCallback((data: ImportHomeworkData) => {
     setPendingHomeworkLinks({ link1: data.link1, link2: data.link2, link3: data.link3 });
     handleImport(data.studentName);
-    setActiveTab('regular-homework');
+    setActiveTab('homework');
     setTimeout(() => { setPendingHomeworkLinks({}); }, 100);
   }, [handleImport]);
 
@@ -101,10 +126,10 @@ export default function HomePage() {
 
   const handleImportStudentToHomework = useCallback((studentName: string) => {
     handleImport(studentName);
-    setActiveTab('regular-homework');
+    setActiveTab('homework');
   }, [handleImport]);
 
-  const handleSwitchToTab = useCallback((tabId: 'regular-feedback' | 'regular-homework') => {
+  const handleSwitchToTab = useCallback((tabId: 'regular-feedback' | 'homework') => {
     setActiveTab(tabId);
   }, []);
 
@@ -125,12 +150,30 @@ export default function HomePage() {
   }, [toast]);
 
   if (!userEmail) {
-    return <AuthForm onLogin={() => { supabase.auth.getSession().then(({ data: { session } }) => { setUserEmail(session?.user?.email || null); }).catch(() => {}); }} />;
+    return <AuthForm onLogin={() => { supabase!.auth.getSession().then(({ data: { session } }) => { if (session?.user?.email) void ensureSeededThenSetEmail(session.user.email); }).catch(() => {}); }} />;
+  }
+
+  if (seeding) {
+    return (
+      <div className="container">
+        <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)' }}>
+          正在同步你的数据…
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="container">
-      <UserMenu email={userEmail} onLogout={() => setUserEmail(null)} />
+      <UserMenu
+        email={userEmail === 'local' ? '本地模式（未启用云端）' : userEmail}
+        onLogout={async () => {
+          if (userEmail === 'local') return;
+          try { await supabase?.auth.signOut(); } catch {}
+          await clearLocalData();
+          setUserEmail(null);
+        }}
+      />
       <ExtensionImportListener
         toast={toast}
         onImportToFeedback={handleImportStudentToFeedback}
@@ -147,8 +190,7 @@ export default function HomePage() {
 
       <div style={{ display: activeTab === 'dashboard' ? 'block' : 'none' }}><DashboardTab onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
       <div style={{ display: activeTab === 'regular-feedback' ? 'block' : 'none' }}><RegularFeedbackTab toast={toast} preSelectStudentId={pendingStudentId} preFillData={pendingFeedbackData} preFillNotes={pendingFeedbackNotes} /></div>
-      <div style={{ display: activeTab === 'regular-homework' ? 'block' : 'none' }}><RegularHomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={pendingHomeworkLinks.link1 ? pendingHomeworkLinks as { link1: string; link2: string; link3: string } : undefined} /></div>
-      <div style={{ display: activeTab === 'batch-homework' ? 'block' : 'none' }}><BatchHomeworkTab toast={toast} onCopy={handleCopy} /></div>
+      <div style={{ display: activeTab === 'homework' ? 'block' : 'none' }}><HomeworkTab toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} preFillLinks={pendingHomeworkLinks.link1 ? pendingHomeworkLinks as { link1: string; link2: string; link3: string } : undefined} /></div>
       <div style={{ display: activeTab === 'meeting' ? 'block' : 'none' }}><MeetingReminder toast={toast} onCopy={handleCopy} preSelectStudentId={pendingStudentId} /></div>
       <div style={{ display: activeTab === 'students' ? 'block' : 'none' }}><StudentProfilesTab toast={toast} onNavigate={(tab) => setActiveTab(tab as TabId)} onSelectStudent={(id) => setPendingStudentId(id)} /></div>
 

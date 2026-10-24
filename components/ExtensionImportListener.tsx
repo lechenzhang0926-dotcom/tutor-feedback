@@ -32,7 +32,7 @@ interface Props {
   toast: (msg: string) => void;
   onImportToFeedback: (studentName: string) => void;
   onImportToHomework: (studentName: string) => void;
-  onSwitchToTab: (tabId: 'regular-feedback' | 'regular-homework') => void;
+  onSwitchToTab: (tabId: 'regular-feedback' | 'homework') => void;
 }
 
 const STORAGE_KEY = 'tutor_extension_import_data';
@@ -117,7 +117,7 @@ export function ExtensionImportListener({ toast, onImportToFeedback, onImportToH
 
   const handleImportStudentToHomework = useCallback((studentName: string) => {
     onImportToHomework(studentName);
-    onSwitchToTab('regular-homework');
+    onSwitchToTab('homework');
   }, [onImportToHomework, onSwitchToTab]);
 
   if (!importData) {
