@@ -199,77 +199,21 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
     setShowTempName(true);
   }, [detectedName]);
 
-  // --------------- 草稿自动保存 ---------------
+  // --------------- 页面内容保留策略 ---------------
   //
-  // 目的：即使页面被浏览器重载、崩溃，或用户误关标签页，
-  //       已经填的链接和已生成的群消息都还在。
+  // 需求：切到别的标签页再回来 → 内容保留；手动刷新（F5）→ 内容清空。
   //
-  // 注意执行顺序：必须「先恢复、后保存」。
-  // 否则保存用的初始空值会先把 localStorage 覆盖掉，恢复就读不到了。
-  const HOMEWORK_DRAFT_KEY = 'tutor_draft_homework';
-  const draftRestoredRef = useRef(false);
-
-  // ① 首次挂载：恢复草稿 → 再设置今天的日期 → 解锁保存
+  // 实现方式：**不做任何持久化**。
+  //   · 切换标签页：组件并未卸载（page.tsx 里各 Tab 用 display:none 切换，
+  //     且已修复 Supabase TOKEN_REFRESHED 导致的整树重挂），React state 天然保留。
+  //   · 刷新页面：组件重新挂载，state 回到初始值 → 内容清空。
+  //
+  // 之前用 localStorage 存草稿是为了兜底「组件被意外卸载」的情况，
+  // 但那样会让刷新后内容也残留，与预期不符，故移除。
   useEffect(() => {
-    let restoredDate: string | null = null;
-    try {
-      const raw = localStorage.getItem(HOMEWORK_DRAFT_KEY);
-      if (raw) {
-        const d = JSON.parse(raw) as {
-          savedAt?: number;
-          date?: string;
-          selectedStudentId?: string;
-          studentName?: string;
-          link1?: string;
-          link2?: string;
-          link3?: string;
-          link4?: string;
-          msgGenerated?: boolean;
-        };
-        // 只恢复 24 小时内保存的草稿，避免把很久以前的作业带进来
-        const fresh = d.savedAt ? Date.now() - d.savedAt < 24 * 60 * 60 * 1000 : false;
-        if (fresh) {
-          if (d.selectedStudentId) setSelectedStudentId(d.selectedStudentId);
-          if (d.studentName) setStudentName(d.studentName);
-          if (d.link1) setLink1(d.link1);
-          if (d.link2) setLink2(d.link2);
-          if (d.link3) setLink3(d.link3);
-          if (d.link4) setLink4(d.link4);
-          if (d.msgGenerated) setMsgGenerated(true);
-          if (d.date) restoredDate = d.date;
-        } else {
-          localStorage.removeItem(HOMEWORK_DRAFT_KEY);
-        }
-      }
-    } catch {
-      // 草稿损坏就忽略，不影响正常使用
-    }
-
-    setDate(restoredDate || getBeijingISODate());
-    draftRestoredRef.current = true;
+    setDate(getBeijingISODate());
     setMounted(true);
   }, []);
-
-  // ② 恢复完成后的任何改动都写回草稿
-  useEffect(() => {
-    if (!mounted || !draftRestoredRef.current) return;
-    const draft = {
-      savedAt: Date.now(),
-      date,
-      selectedStudentId,
-      studentName,
-      link1,
-      link2,
-      link3,
-      link4,
-      msgGenerated,
-    };
-    try {
-      localStorage.setItem(HOMEWORK_DRAFT_KEY, JSON.stringify(draft));
-    } catch {
-      // 隐私模式或存储已满时忽略
-    }
-  }, [mounted, date, selectedStudentId, studentName, link1, link2, link3, link4, msgGenerated]);
 
   // --------------- 格式化日期 ---------------
 
@@ -659,7 +603,6 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
             setPdfError('');
             setPdfFiles([]);
             setPdfSession('');
-            localStorage.removeItem(HOMEWORK_DRAFT_KEY);
           }}>
             清空
           </button>
