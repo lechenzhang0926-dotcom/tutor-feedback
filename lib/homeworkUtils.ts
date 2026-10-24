@@ -182,31 +182,55 @@ export function classifyLink1ByUrl(url: string): HomeworkType | null {
 const IPA_RE = /[\u0250-\u02AF\u1D00-\u1DBF\u00E6\u014B\u03B8\u00F0]/g;
 const SLASH_IPA_RE = /\/[^/]*[\u0250-\u02AF\u1D00-\u1DBF\u00E6\u014B\u03B8\u00F0][^/]*\//g;
 
+// 表头 / 模板文字：这些中文在「纯英文版」里也存在，
+// 若不剔除，会让「英文版」被误判成「中英文」。
+// 只列固定模板词，不要写宽泛的「标题」「话题」——那是正文词义，剔了会误判。
+const TEMPLATE_RE =
+  /学生姓名|姓名|助教|日期|成绩|复习日期|遗忘词数|打印时间|第[一二三四五六七八九十百千\d]+天/g;
+
 /**
  * 根据 PDF 文本内容判断类型（内容兜底）。
- * 仅靠字符比例做最佳猜测，英文/中文/中英文之间本就高度重叠，
- * 故链接识别（classifyLink1ByUrl）才是主依据，本函数仅作兜底。
+ *
+ * 判定思路：
+ *   1. 先剔除表头模板（姓名/助教/日期/成绩/第X天…），只看正文；
+ *   2. 再按「汉字 vs 字母」的**占比**判断，而不是「两者都大于 0」。
+ *
+ * 之前用 `cjk > 0 && latin > 0` 判断，导致：
+ *   · 纯英文版里有一行「姓名：xx 助教： 日期： 成绩：」→ 被当成中英文
+ *   · 纯中文版里混入 1 个字母（如 n.）→ 同样被当成中英文
+ *   实测三份同批 PDF（中英文/英文/中文）全部被命名为「中英文」。
  */
 export function classifyByText(text: string): HomeworkType | null {
   if (!text || !text.trim()) return null;
 
-  const cjk = (text.match(/[一-鿿]/g) || []).length;
-  const latin = (text.match(/[A-Za-z]/g) || []).length;
+  // 音标优先：先把音标符号数出来（用原始文本，避免模板剔除影响）
   const ipa = (text.match(IPA_RE) || []).length;
   const slashIpa = (text.match(SLASH_IPA_RE) || []).length;
   const ipaScore = ipa + slashIpa * 2;
 
-  // 含音标符号且中文不多 → 音标（高置信）
-  // 要求较强信号（多个 /.../ 注音 或 IPA 符号明显多于中文），避免把带发音的英文/中英文页误判为音标
-  if ((ipaScore >= 3 && cjk < ipaScore) || (slashIpa >= 2 && cjk <= ipaScore * 2)) return '音标';
-  // 中文 + 英文混排
-  if (cjk > 0 && latin > 0) return '中英文';
-  // 以中文为主
-  if (cjk > latin) return '中文';
-  // 以英文为主
-  if (latin > 0) return '英文';
+  const rawCjk = (text.match(/[一-鿿]/g) || []).length;
+  if ((ipaScore >= 3 && rawCjk < ipaScore) || (slashIpa >= 2 && rawCjk <= ipaScore * 2)) return '音标';
 
-  return null;
+  // 剔除表头模板后再统计正文
+  const body = text.replace(TEMPLATE_RE, ' ');
+  let cjk = (body.match(/[一-鿿]/g) || []).length;
+  let latin = (body.match(/[A-Za-z]/g) || []).length;
+
+  // 剔除后几乎无内容（例如整页只有表头）→ 回退用原文本，避免判空
+  if (cjk + latin < 10) {
+    cjk = rawCjk;
+    latin = (text.match(/[A-Za-z]/g) || []).length;
+  }
+
+  const total = cjk + latin;
+  if (total === 0) return null;
+
+  const cjkRatio = cjk / total;
+
+  // 占比判定：一侧占绝对多数即视为单语，否则视为中英混排
+  if (cjkRatio >= 0.75) return '中文';
+  if (cjkRatio <= 0.25) return '英文';
+  return '中英文';
 }
 
 /**
