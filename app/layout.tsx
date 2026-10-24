@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import BeiAnFooter from '@/components/BeiAnFooter';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="bg-blob bg-blob-3" />
         </div>
         {children}
+        <BeiAnFooter />
       </body>
     </html>
   );
