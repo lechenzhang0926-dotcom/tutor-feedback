@@ -7,7 +7,7 @@
 
 ## 你已经有的
 
-项目根目录的 `.env.local` 里**已经有 Supabase 的 URL 和 anon key**（你之前建过 Supabase 项目）。
+项目根目录的 `.env.local` 里**已经有 Supabase 的 URL 和 anon key**。
 所以代码层面"登录 + 每人独立数据"已经接通了。还差两件事才能真正用上云端：
 
 1. **给 Supabase 项目建表 + 权限**（只做一次）。
@@ -17,7 +17,7 @@
 
 ## 第一步：在 Supabase 建表（一次性）
 
-1. 打开你的 Supabase 项目（就是你 `.env.local` 里那个 `rudqbtocugrpbsdsdswl.supabase.co`）。
+1. 打开你的 Supabase 项目（`fimfolkytdjwvpzwnvfd.supabase.co`）。
 2. 左侧菜单 → **SQL Editor** → **New query**。
 3. 把本项目 `supabase/schema.sql` 的**全部内容**粘贴进去，点 **Run**。
    - 它会建 3 张表：`students`（学生档案）、`feedback_history`（反馈历史）、`daily_usage`（每日限流）。
@@ -46,6 +46,10 @@ Supabase 默认"注册要邮箱确认"。你自己用可以关掉：
    - `ANTHROPIC_API_KEY` = 你的 Anthropic key
 5. 部署完成后，Railway 会给一个 `*.up.railway.app` 的网址，谁都能打开。
 6. 打开网址 → 注册一个账号 → 登录即可使用。你（和以后注册的人）各自数据独立。
+
+> ⚠️ **关于两个 `NEXT_PUBLIC_*` 变量**：它们会在「构建镜像时」被写死进前端代码。
+> Dockerfile 里已经声明了同名的 `ARG`，Railway 会自动把上面的变量值传进构建过程。
+> 所以：**改了这两个值，必须重新部署（Rebuild）**，只改不重建是不生效的。
 
 > 想更便宜/完全自控，也可以租一台小 VPS（¥30–40/月），把仓库 clone 下来 `docker build` + `docker run -p 80:10000` 即可，环境变量同样填。
 
