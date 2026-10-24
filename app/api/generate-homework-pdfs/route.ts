@@ -15,6 +15,10 @@ import {
   classifyAndNamePdfDirect,
   assignName,
   classifyFromTextAndUrl,
+  isArticleListUrl,
+  parseArticleIds,
+  buildSingleArticleUrl,
+  sanitizeFileNamePart,
   type HomeworkType,
 } from '@/lib/homeworkUtils';
 
@@ -98,6 +102,7 @@ export async function POST(request: NextRequest) {
     const tasks: PdfTask[] = [];
     let pagePrintLink1 = ''; // link1 的页面打印 URL（仅 page 模式有值）
     let link1Pages: string[] = []; // link1 的多个页面链接（每个单独识别命名生成）
+    let articleTasks: { url: string; id: string }[] = []; // 文章列表页：逐篇生成
     const usedLink1 = new Map<HomeworkType, number>(); // 链接1 内命名去重（PDF 与页面链接共享）
 
     if (link1) {
@@ -110,6 +115,21 @@ export async function POST(request: NextRequest) {
         // 多个页面链接：收集起来稍后用浏览器逐个识别、各生成 1 份 PDF
         if (parsed.pageUrls && parsed.pageUrls.length) {
           link1Pages = parsed.pageUrls.map((u) => normalizeUrl(u));
+        }
+      } else if (parsed.mode === 'article') {
+        // 文章列表页：把每个 id 展开成「单篇文章」的链接，逐篇生成
+        for (const raw of parsed.articleUrls || []) {
+          const url = normalizeUrl(raw);
+          if (!isArticleListUrl(url)) continue;
+          const ids = parseArticleIds(url);
+          if (ids.length === 0) {
+            // 没带 id，退化为整页生成一篇
+            articleTasks.push({ url, id: '' });
+          } else {
+            for (const id of ids) {
+              articleTasks.push({ url: buildSingleArticleUrl(url, id), id });
+            }
+          }
         }
       } else if (parsed.mode === 'page' && parsed.pageUrl) {
         const pageUrl = normalizeUrl(parsed.pageUrl);
@@ -265,6 +285,60 @@ export async function POST(request: NextRequest) {
             const msg = err instanceof Error ? err.message : '未知错误';
             console.error(`[generate-homework-pdfs] 课后作业1页面 ${pageUrl} 失败:`, msg);
             files.push({ name: `${prefix}-文件${i + 1}.pdf`, size: 0, error: msg });
+          } finally {
+            await context.close().catch(() => {});
+          }
+        })());
+      }
+    }
+
+    // --- 组 2.6: 文章列表页，逐篇生成（文件名 = 学生名-日期-文章名）---
+    if (articleTasks.length > 0) {
+      const usedArticleNames = new Map<string, number>();
+      for (let i = 0; i < articleTasks.length; i++) {
+        const item = articleTasks[i];
+        const index = i;
+        parallelJobs.push((async () => {
+          const context = await browser.newContext();
+          let fallbackName = `${prefix}-文章${index + 1}.pdf`;
+          try {
+            const page = await context.newPage();
+            await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForTimeout(800);
+
+            // 文章标题优先取 h1/h2（该站点用 h2 显示文章名）
+            const title = await page.evaluate(() => {
+              const pick = (sel: string) => {
+                for (const el of Array.from(document.querySelectorAll(sel))) {
+                  const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                  if (t && t.length <= 120) return t;
+                }
+                return '';
+              };
+              return pick('h1') || pick('h2') || pick('h3');
+            }).catch(() => '');
+
+            const articleName = sanitizeFileNamePart(title) || `文章${index + 1}`;
+
+            // 同名文章去重（如两篇文章标题相同）
+            const n = (usedArticleNames.get(articleName) || 0) + 1;
+            usedArticleNames.set(articleName, n);
+            const base = `${prefix}-${articleName}${n > 1 ? `(${n})` : ''}`;
+            const name = `${base}.pdf`;
+            fallbackName = name;
+
+            const pdfBuffer = await page.pdf({
+              format: 'A4',
+              printBackground: true,
+              margin: { top: '10mm', bottom: '10mm', left: '10mm', right: '10mm' },
+            });
+            const filePath = path.join(sessionDir, name);
+            await fs.writeFile(filePath, pdfBuffer);
+            files.push({ name, size: pdfBuffer.length });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : '未知错误';
+            console.error(`[generate-homework-pdfs] 文章 ${item.url} 失败:`, msg);
+            files.push({ name: fallbackName, size: 0, error: msg });
           } finally {
             await context.close().catch(() => {});
           }

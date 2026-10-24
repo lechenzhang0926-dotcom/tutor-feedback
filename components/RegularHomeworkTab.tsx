@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { buildHomeworkMessage } from '@/lib/homeworkMessage';
+import { isArticleListUrl, parseArticleIds } from '@/lib/homeworkUtils';
 import { getStudents, getStudentById, saveStudent } from '@/lib/storage';
 import { getBeijingISODate } from '@/lib/beijingTime';
 import { incrementHomeworkMsgCount, incrementTotalHomeworkCount, recordStudentUsage } from '@/lib/dashboardUtils';
@@ -68,6 +69,14 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
   const [pdfError, setPdfError] = useState('');
   const [pdfSession, setPdfSession] = useState('');
   const [pdfFiles, setPdfFiles] = useState<{ name: string; size: number; error?: string }[]>([]);
+
+  // 「单独询问学生名字」弹窗（文章列表页没有学生名，需要用户提供）
+  const [askNameOpen, setAskNameOpen] = useState(false);
+  const [askNameValue, setAskNameValue] = useState('');
+
+  // link1 是否为文章列表页链接；顺带算出文章篇数，用于界面提示
+  const isArticleLink = isArticleListUrl(link1.trim());
+  const articleCount = isArticleLink ? parseArticleIds(link1).length : 0;
 
   /** 在档案中查找匹配的学生：先精确匹配，再模糊匹配 */
   const matchStudentByName = useCallback((name: string): { exact: StudentProfile | null; fuzzy: StudentProfile | null } => {
@@ -323,19 +332,11 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
 
   // --------------- 下载 PDF（生成 + 自动下载全部） ---------------
 
-  const handleDownloadPdfs = useCallback(async () => {
-    let name = studentName.trim();
-    if (!name) {
-      name = await fetchNameFromLinks();
-      if (name) {
-        setStudentName(name);
-        handleDetectedName(name);
-      }
-    }
-    if (!name) {
-      toast('请填写学生名字');
-      return;
-    }
+  /**
+   * 真正的下载动作。抽出来是因为文章列表页需要先「单独询问学生名字」，
+   * 问完拿到名字后再调用这里继续。
+   */
+  const doDownloadPdfs = useCallback(async (name: string) => {
     if (!link1.trim() && !link2.trim() && !link3.trim() && !link4.trim()) {
       toast('请至少填写一个作业链接');
       return;
@@ -401,7 +402,44 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
     } finally {
       setPdfLoading(false);
     }
-  }, [studentName, date, link1, link2, link3, toast, getFormattedDate, fetchNameFromLinks, handleDetectedName]);
+  }, [link1, link2, link3, link4, toast, getFormattedDate]);
+
+  const handleDownloadPdfs = useCallback(async () => {
+    let name = studentName.trim();
+
+    if (!name) {
+      // 文章列表页上只有文章标题，没有学生名字，自动识别不出来 →
+      // 单独弹窗询问学生名字（PDF 命名需要它）。
+      if (isArticleLink) {
+        setAskNameValue('');
+        setAskNameOpen(true);
+        return;
+      }
+      name = await fetchNameFromLinks();
+      if (name) {
+        setStudentName(name);
+        handleDetectedName(name);
+      }
+    }
+    if (!name) {
+      toast('请填写学生名字');
+      return;
+    }
+    await doDownloadPdfs(name);
+  }, [studentName, isArticleLink, fetchNameFromLinks, handleDetectedName, toast, doDownloadPdfs]);
+
+  /** 弹窗里确认学生名字后继续下载 */
+  const confirmAskNameAndDownload = useCallback(async () => {
+    const name = askNameValue.trim();
+    if (!name) {
+      toast('请输入学生名字');
+      return;
+    }
+    setAskNameOpen(false);
+    setStudentName(name);
+    handleDetectedName(name);
+    await doDownloadPdfs(name);
+  }, [askNameValue, toast, handleDetectedName, doDownloadPdfs]);
 
   const downloadSinglePdf = useCallback((fileName: string) => {
     const a = document.createElement('a');
@@ -630,7 +668,80 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
         {pdfError && (
           <div style={{ color: 'var(--danger)', fontSize: '.85rem', marginTop: 10 }}>{pdfError}</div>
         )}
+
+        {/* 文章列表页提示：说明会按文章逐篇生成，文件名带文章名 */}
+        {isArticleLink && (
+          <div
+            style={{
+              marginTop: 12,
+              padding: '10px 12px',
+              background: 'var(--accent-light)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)',
+              fontSize: '.85rem',
+              color: 'var(--text)',
+              lineHeight: 1.7,
+            }}
+          >
+            识别到<strong>文章打印页</strong>链接
+            {articleCount > 0 ? `，共 ${articleCount} 篇文章` : ''}。
+            生成的 PDF 会按<strong>「学生名-日期-文章名」</strong>逐篇命名。
+            {!studentName.trim() && <><br />点击「下载 PDF」时会先询问学生名字。</>}
+          </div>
+        )}
       </div>
+
+      {/* 单独询问学生名字（文章列表页没有学生名，需要用户提供） */}
+      {askNameOpen && (
+        <div
+          onClick={() => setAskNameOpen(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(40, 30, 20, .35)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
+          }}
+        >
+          <div
+            className="card"
+            onClick={(e) => e.stopPropagation()}
+            style={{ width: '100%', maxWidth: 380, margin: 0 }}
+          >
+            <div className="card-title">这个链接需要学生名字</div>
+            <div style={{ fontSize: '.85rem', color: 'var(--muted)', marginBottom: 12, lineHeight: 1.7 }}>
+              文章打印页里没有学生信息，PDF 需要按「学生名-日期-文章名」命名，请填写学生名字。
+            </div>
+
+            <div className="field" style={{ marginBottom: 14 }}>
+              <label>学生名字</label>
+              <input
+                type="text"
+                autoFocus
+                value={askNameValue}
+                onChange={(e) => setAskNameValue(e.target.value)}
+                placeholder="例如：浩博"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void confirmAskNameAndDownload();
+                  if (e.key === 'Escape') setAskNameOpen(false);
+                }}
+              />
+            </div>
+
+            <div className="btn-row" style={{ marginTop: 0 }}>
+              <button className="btn btn-primary" onClick={() => void confirmAskNameAndDownload()}>
+                确定并生成 PDF
+              </button>
+              <button className="btn btn-ghost" onClick={() => setAskNameOpen(false)}>
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 群消息 Card */}
       {msgGenerated && homeworkMsg && (

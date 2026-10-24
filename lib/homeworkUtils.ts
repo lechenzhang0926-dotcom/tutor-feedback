@@ -22,14 +22,71 @@ import * as zlib from 'zlib';
 /** 作业 PDF 的四种类型 */
 export type HomeworkType = '中英文' | '英文' | '中文' | '音标';
 
+// ============================================================
+// 文章列表页（教学详情 · 文章打印页）
+//   形如：https://host//pc/prints/article-list?userId=37001&id[0]=120&id[1]=121
+// 特点：
+//   · 页面上没有学生名字，只有一篇或多篇文章标题（h1/h2）
+//   · 每个 id[n] 对应一篇文章，同一页面会一起渲染
+//   · 直接 page.pdf() 即可得到可打印的干净内容（打印按钮由 @media print 自行隐藏）
+// 因此：学生名必须单独询问用户；PDF 按「学生名-日期-文章名」逐个文章生成。
+// ============================================================
+
+/** 是否是文章列表页链接 */
+export function isArticleListUrl(url: string): boolean {
+  return /\/pc\/prints\/article-list/i.test(url);
+}
+
+/** 取出链接里所有文章 id（id[0]=120&id[1]=121 或 id=120），去重保序 */
+export function parseArticleIds(url: string): string[] {
+  const ids: string[] = [];
+  const re = /[?&]id(?:\[\d*\])?=([^&#]+)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(url))) {
+    const v = decodeURIComponent(m[1]).trim();
+    if (v && !ids.includes(v)) ids.push(v);
+  }
+  return ids;
+}
+
+/**
+ * 由文章列表页链接派生出「只包含某一篇文章」的链接。
+ * 保留原来的 userId 等参数，只把 id[...] 换成单个 id[0]=目标id。
+ */
+export function buildSingleArticleUrl(url: string, id: string): string {
+  const qIndex = url.indexOf('?');
+  const base = qIndex === -1 ? url : url.slice(0, qIndex);
+  const query = qIndex === -1 ? '' : url.slice(qIndex + 1);
+
+  const kept = query
+    .split('&')
+    .filter(Boolean)
+    .filter((pair) => !/^id(\[\d*\])?=/i.test(pair));
+
+  kept.push(`id[0]=${encodeURIComponent(id)}`);
+  return `${base}?${kept.join('&')}`;
+}
+
+/** 把文章标题清洗成可用于文件名的形式 */
+export function sanitizeFileNamePart(s: string, maxLen = 60): string {
+  return (s || '')
+    .replace(/[\\/:*?"<>|\r\n\t]/g, ' ')  // 文件系统非法字符
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLen)
+    .trim();
+}
+
 export interface ParsedLink1 {
-  mode: 'page' | 'pdf-direct';
+  mode: 'page' | 'pdf-direct' | 'article';
   /** 单页面链接（page 模式：打印该页 4 个版本） */
   pageUrl?: string;
   /** PDF 直链（按内容/链接识别命名） */
   pdfUrls?: string[];
   /** 多个页面链接（pdf-direct 模式：每个单独识别命名、生成 1 份） */
   pageUrls?: string[];
+  /** 文章列表页链接（article 模式：按文章逐篇生成，文件名带文章名） */
+  articleUrls?: string[];
 }
 
 /**
@@ -66,6 +123,15 @@ export function parseLink1Input(input: string): ParsedLink1 {
   if (pageUrls.length === 0) {
     return { mode: 'page', pageUrl: trimmed };
   }
+
+  // 文章列表页：必须在「单页面 → 4 版本」之前判断。
+  // 这类页面只有一个链接，但它没有"打印英文/中文/音标"按钮，
+  // 且页面上没有学生名，应走按文章逐篇生成的分支。
+  const articleUrls = pageUrls.filter(isArticleListUrl);
+  if (articleUrls.length > 0 && articleUrls.length === pageUrls.length) {
+    return { mode: 'article', articleUrls };
+  }
+
   // 仅 1 个页面链接 → 老逻辑：打印该页 4 个版本
   if (pageUrls.length === 1) {
     return { mode: 'page', pageUrl: pageUrls[0] };
