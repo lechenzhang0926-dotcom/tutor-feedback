@@ -31,6 +31,11 @@ export default function HomePage() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
   const gotSessionRef = useRef(false);
+  // 已经为哪个用户做过云端同步。
+  // 关键：同一用户只需同步一次。否则浏览器切回标签页时 Supabase 会自动刷新 token，
+  // 触发 onAuthStateChange('TOKEN_REFRESHED')，若再次进入 seeding 分支，
+  // 会把整个界面卸载重建 —— 用户正在填的作业内容就全没了。
+  const seededUserRef = useRef<string | null>(null);
   const [pendingStudentId, setPendingStudentId] = useState('');
   const [pendingFeedbackData, setPendingFeedbackData] = useState('');
   const [pendingFeedbackNotes, setPendingFeedbackNotes] = useState('');
@@ -41,12 +46,20 @@ export default function HomePage() {
       setUserEmail(email);
       return;
     }
+
+    // 已经同步过同一用户 → 只更新邮箱，绝不重放 seeding 遮罩（否则界面会被卸载）
+    if (seededUserRef.current === email) {
+      setUserEmail(email);
+      return;
+    }
+
     setSeeding(true);
     try {
       await seedFromSupabase();
     } catch {
       // 云端拉取失败也不阻塞使用，继续用本地数据
     } finally {
+      seededUserRef.current = email;
       setSeeding(false);
       setUserEmail(email);
     }
@@ -67,15 +80,21 @@ export default function HomePage() {
       }
     }).catch(() => {});
 
-    const { data: { subscription } } = supabase!.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase!.auth.onAuthStateChange((event, session) => {
       if (cancelled) return;
-      if (!gotSessionRef.current && !session?.user?.email) return;
-      gotSessionRef.current = true;
-      if (session?.user?.email) {
-        void ensureSeededThenSetEmail(session.user.email);
-      } else {
+
+      // token 后台刷新不代表用户重新登录，直接忽略，避免打断用户操作
+      if (event === 'TOKEN_REFRESHED') return;
+
+      if (event === 'SIGNED_OUT' || !session?.user?.email) {
+        if (!gotSessionRef.current) return;
+        seededUserRef.current = null;
         void clearLocalData().then(() => setUserEmail(null));
+        return;
       }
+
+      gotSessionRef.current = true;
+      void ensureSeededThenSetEmail(session.user.email);
     });
 
     return () => { cancelled = true; subscription.unsubscribe(); };

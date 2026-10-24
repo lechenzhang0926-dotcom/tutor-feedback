@@ -95,9 +95,68 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
   const pastedRef = useRef('');
   const lastClipRef = useRef('');
 
+  // --------------- 草稿自动保存 ---------------
+  //
+  // 目的：页面被重载/浏览器切走再回来时，粘贴的链接和**已生成的结果**都不要丢。
+  // 已生成的结果尤其重要 —— 重新生成既要等时间，又要再花一次 API 费用。
+  //
+  // 顺序要求：先恢复、再保存。保存一旦先跑，就会用初始空值覆盖掉草稿。
+  const BATCH_DRAFT_KEY = 'tutor_draft_homework_batch';
+  const draftRestoredRef = useRef(false);
+
   useEffect(() => {
-    setDate(getBeijingISODate());
+    let restoredDate: string | null = null;
+    try {
+      const raw = localStorage.getItem(BATCH_DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw) as {
+          savedAt?: number;
+          date?: string;
+          pasted?: string;
+          groups?: StudentEntry[];
+          results?: StudentResult[];
+          studentNoByName?: Record<string, string>;
+        };
+        // 只恢复 24 小时内的草稿
+        const fresh = d.savedAt ? Date.now() - d.savedAt < 24 * 60 * 60 * 1000 : false;
+        if (fresh) {
+          if (d.pasted) setPasted(d.pasted);
+          if (Array.isArray(d.groups) && d.groups.length) setGroups(d.groups);
+          if (Array.isArray(d.results) && d.results.length) {
+            // 清掉「生成中」标记：上次可能是在生成途中被切走/重载的，
+            // 不清的话恢复后会一直显示"生成中"卡住。
+            setResults(d.results.map((r) => ({ ...r, generating: false })));
+          }
+          if (d.studentNoByName) setStudentNoByName(d.studentNoByName);
+          if (d.date) restoredDate = d.date;
+        } else {
+          localStorage.removeItem(BATCH_DRAFT_KEY);
+        }
+      }
+    } catch {
+      // 草稿损坏就忽略
+    }
+
+    setDate(restoredDate || getBeijingISODate());
+    draftRestoredRef.current = true;
   }, []);
+
+  useEffect(() => {
+    if (!draftRestoredRef.current) return;
+    const draft = {
+      savedAt: Date.now(),
+      date,
+      pasted,
+      groups,
+      results,
+      studentNoByName,
+    };
+    try {
+      localStorage.setItem(BATCH_DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // 隐私模式或存储已满时忽略
+    }
+  }, [date, pasted, groups, results, studentNoByName]);
 
   useEffect(() => {
     pastedRef.current = pasted;

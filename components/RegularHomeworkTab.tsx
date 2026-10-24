@@ -28,10 +28,8 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
   const [fuzzyMatchStudent, setFuzzyMatchStudent] = useState<StudentProfile | null>(null);
   const [showFuzzyPrompt, setShowFuzzyPrompt] = useState(false);
 
-  useEffect(() => {
-    setDate(getBeijingISODate());
-    setMounted(true);
-  }, []);
+  // 日期 / mounted 的初始化放在下方「草稿自动保存」的 ① 里统一处理，
+  // 需要先尝试恢复草稿，才能决定用草稿里的日期还是今天。
 
   useEffect(() => {
     if (preSelectStudentId) {
@@ -193,28 +191,76 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
   }, [detectedName]);
 
   // --------------- 草稿自动保存 ---------------
+  //
+  // 目的：即使页面被浏览器重载、崩溃，或用户误关标签页，
+  //       已经填的链接和已生成的群消息都还在。
+  //
+  // 注意执行顺序：必须「先恢复、后保存」。
+  // 否则保存用的初始空值会先把 localStorage 覆盖掉，恢复就读不到了。
   const HOMEWORK_DRAFT_KEY = 'tutor_draft_homework';
-  useEffect(() => {
-    if (!mounted) return;
-    const draft = { studentName, date, link1, link2, link3, link4 };
-    localStorage.setItem(HOMEWORK_DRAFT_KEY, JSON.stringify(draft));
-  }, [mounted, studentName, date, link1, link2, link3, link4]);
+  const draftRestoredRef = useRef(false);
 
+  // ① 首次挂载：恢复草稿 → 再设置今天的日期 → 解锁保存
   useEffect(() => {
-    if (!mounted) return;
+    let restoredDate: string | null = null;
     try {
       const raw = localStorage.getItem(HOMEWORK_DRAFT_KEY);
       if (raw) {
-        const draft = JSON.parse(raw);
-        if (draft.studentName) setStudentName(draft.studentName);
-        if (draft.date) setDate(draft.date);
-        if (draft.link1) setLink1(draft.link1);
-        if (draft.link2) setLink2(draft.link2);
-        if (draft.link3) setLink3(draft.link3);
-        if (draft.link4) setLink4(draft.link4);
+        const d = JSON.parse(raw) as {
+          savedAt?: number;
+          date?: string;
+          selectedStudentId?: string;
+          studentName?: string;
+          link1?: string;
+          link2?: string;
+          link3?: string;
+          link4?: string;
+          msgGenerated?: boolean;
+        };
+        // 只恢复 24 小时内保存的草稿，避免把很久以前的作业带进来
+        const fresh = d.savedAt ? Date.now() - d.savedAt < 24 * 60 * 60 * 1000 : false;
+        if (fresh) {
+          if (d.selectedStudentId) setSelectedStudentId(d.selectedStudentId);
+          if (d.studentName) setStudentName(d.studentName);
+          if (d.link1) setLink1(d.link1);
+          if (d.link2) setLink2(d.link2);
+          if (d.link3) setLink3(d.link3);
+          if (d.link4) setLink4(d.link4);
+          if (d.msgGenerated) setMsgGenerated(true);
+          if (d.date) restoredDate = d.date;
+        } else {
+          localStorage.removeItem(HOMEWORK_DRAFT_KEY);
+        }
       }
-    } catch {}
-  }, [mounted]);
+    } catch {
+      // 草稿损坏就忽略，不影响正常使用
+    }
+
+    setDate(restoredDate || getBeijingISODate());
+    draftRestoredRef.current = true;
+    setMounted(true);
+  }, []);
+
+  // ② 恢复完成后的任何改动都写回草稿
+  useEffect(() => {
+    if (!mounted || !draftRestoredRef.current) return;
+    const draft = {
+      savedAt: Date.now(),
+      date,
+      selectedStudentId,
+      studentName,
+      link1,
+      link2,
+      link3,
+      link4,
+      msgGenerated,
+    };
+    try {
+      localStorage.setItem(HOMEWORK_DRAFT_KEY, JSON.stringify(draft));
+    } catch {
+      // 隐私模式或存储已满时忽略
+    }
+  }, [mounted, date, selectedStudentId, studentName, link1, link2, link3, link4, msgGenerated]);
 
   // --------------- 格式化日期 ---------------
 
