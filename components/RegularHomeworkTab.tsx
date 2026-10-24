@@ -684,8 +684,9 @@ export function RegularHomeworkTab({ toast, onCopy, preSelectStudentId, preFillL
             }}
           >
             识别到<strong>文章打印页</strong>链接
-            {articleCount > 0 ? `，共 ${articleCount} 篇文章` : ''}。
-            生成的 PDF 会按<strong>「学生名-日期-文章名」</strong>逐篇命名。
+            {articleCount > 0 ? `（含 ${articleCount} 个文章 id）` : ''}。
+            这个链接会生成 <strong>1 份 PDF</strong>，文件名按
+            <strong>「学生名-日期-文章名」</strong>命名。
             {!studentName.trim() && <><br />点击「下载 PDF」时会先询问学生名字。</>}
           </div>
         )}

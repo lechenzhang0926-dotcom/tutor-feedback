@@ -16,8 +16,6 @@ import {
   assignName,
   classifyFromTextAndUrl,
   isArticleListUrl,
-  parseArticleIds,
-  buildSingleArticleUrl,
   sanitizeFileNamePart,
   type HomeworkType,
 } from '@/lib/homeworkUtils';
@@ -102,7 +100,7 @@ export async function POST(request: NextRequest) {
     const tasks: PdfTask[] = [];
     let pagePrintLink1 = ''; // link1 的页面打印 URL（仅 page 模式有值）
     let link1Pages: string[] = []; // link1 的多个页面链接（每个单独识别命名生成）
-    let articleTasks: { url: string; id: string }[] = []; // 文章列表页：逐篇生成
+    let articleTasks: { url: string }[] = []; // 文章列表页：一个链接生成 1 份 PDF
     const usedLink1 = new Map<HomeworkType, number>(); // 链接1 内命名去重（PDF 与页面链接共享）
 
     if (link1) {
@@ -117,19 +115,13 @@ export async function POST(request: NextRequest) {
           link1Pages = parsed.pageUrls.map((u) => normalizeUrl(u));
         }
       } else if (parsed.mode === 'article') {
-        // 文章列表页：把每个 id 展开成「单篇文章」的链接，逐篇生成
+        // 文章列表页：**一个链接就生成 1 份 PDF**（整页打印）。
+        // 不要按 id 拆开：链接里的 id[0]、id[1] 常常是同一篇（甚至内容相同），
+        // 拆开会冒出用户没预期的重复文件。
         for (const raw of parsed.articleUrls || []) {
           const url = normalizeUrl(raw);
           if (!isArticleListUrl(url)) continue;
-          const ids = parseArticleIds(url);
-          if (ids.length === 0) {
-            // 没带 id，退化为整页生成一篇
-            articleTasks.push({ url, id: '' });
-          } else {
-            for (const id of ids) {
-              articleTasks.push({ url: buildSingleArticleUrl(url, id), id });
-            }
-          }
+          articleTasks.push({ url });
         }
       } else if (parsed.mode === 'page' && parsed.pageUrl) {
         const pageUrl = normalizeUrl(parsed.pageUrl);
@@ -292,7 +284,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // --- 组 2.6: 文章列表页，逐篇生成（文件名 = 学生名-日期-文章名）---
+    // --- 组 2.6: 文章列表页，每个链接生成 1 份（文件名 = 学生名-日期-文章名）---
     if (articleTasks.length > 0) {
       const usedArticleNames = new Map<string, number>();
       for (let i = 0; i < articleTasks.length; i++) {
@@ -306,27 +298,36 @@ export async function POST(request: NextRequest) {
             await page.goto(item.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
             await page.waitForTimeout(800);
 
-            // 文章标题优先取 h1/h2（该站点用 h2 显示文章名）
-            const title = await page.evaluate(() => {
-              const pick = (sel: string) => {
+            // 取出页面上所有文章标题（该站点用 h2 显示文章名），去重保序
+            const titles: string[] = await page.evaluate(() => {
+              const seen = new Set<string>();
+              const out: string[] = [];
+              for (const sel of ['h1', 'h2', 'h3']) {
                 for (const el of Array.from(document.querySelectorAll(sel))) {
                   const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
-                  if (t && t.length <= 120) return t;
+                  if (t && t.length <= 120 && !seen.has(t)) {
+                    seen.add(t);
+                    out.push(t);
+                  }
                 }
-                return '';
-              };
-              return pick('h1') || pick('h2') || pick('h3');
-            }).catch(() => '');
+              }
+              return out;
+            }).catch(() => [] as string[]);
 
-            const articleName = sanitizeFileNamePart(title) || `文章${index + 1}`;
+            // 文件名用第一篇的标题（例如 "Cat"）
+            const primary = sanitizeFileNamePart(titles[0] || '');
+            // 若这一页确实包含多篇不同文章，补上「等N篇」让文件名不误导
+            const articleName = primary
+              ? (titles.length > 1 ? `${primary}等${titles.length}篇` : primary)
+              : `文章${index + 1}`;
 
-            // 同名文章去重（如两篇文章标题相同）
+            // 同名学生/同名文章去重
             const n = (usedArticleNames.get(articleName) || 0) + 1;
             usedArticleNames.set(articleName, n);
-            const base = `${prefix}-${articleName}${n > 1 ? `(${n})` : ''}`;
-            const name = `${base}.pdf`;
+            const name = `${prefix}-${articleName}${n > 1 ? `(${n})` : ''}.pdf`;
             fallbackName = name;
 
+            // 整页打印：一篇文章或（偶尔）多篇同页，都只出这一份 PDF
             const pdfBuffer = await page.pdf({
               format: 'A4',
               printBackground: true,

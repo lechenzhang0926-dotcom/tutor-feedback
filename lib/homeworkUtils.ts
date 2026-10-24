@@ -52,6 +52,9 @@ export function parseArticleIds(url: string): string[] {
 /**
  * 由文章列表页链接派生出「只包含某一篇文章」的链接。
  * 保留原来的 userId 等参数，只把 id[...] 换成单个 id[0]=目标id。
+ *
+ * 注意：当前生成逻辑不按 id 拆分（一个链接只出 1 份 PDF），
+ * 此函数保留供将来按篇生成时使用。
  */
 export function buildSingleArticleUrl(url: string, id: string): string {
   const qIndex = url.indexOf('?');
