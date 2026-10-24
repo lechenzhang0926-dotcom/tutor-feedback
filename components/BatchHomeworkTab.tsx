@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { routeHomeworkLink } from '@/lib/homeworkUtils';
+import { routeHomeworkLink, isArticleListUrl } from '@/lib/homeworkUtils';
 import { buildHomeworkMessage } from '@/lib/homeworkMessage';
 import { getBeijingISODate } from '@/lib/beijingTime';
 import { getStudents, saveStudent } from '@/lib/storage';
@@ -43,6 +43,20 @@ interface StudentResult {
   generating?: boolean;
 }
 
+/**
+ * 文章打印页链接。
+ * 这类页面里**没有学生名字**，只有文章标题，
+ * 所以不能拿去识别学生名、更不能混进「已分组」里当作某个学生。
+ * 必须单独列出，让用户为每条链接指定学生。
+ */
+interface ArticleLinkEntry {
+  url: string;
+  studentName: string;
+  /** 抓到的文章名（可选，仅用于界面显示） */
+  articleTitles?: string[];
+  loadingTitles?: boolean;
+}
+
 const SLOT_LABELS: { key: keyof LinkGroup; label: string }[] = [
   { key: 'link1', label: '作业1（打印页/PDF）' },
   { key: 'link2', label: '作业2（抗遗忘）' },
@@ -76,6 +90,8 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
   const [nameAliases, setNameAliases] = useState<{ detected: string; archive: string }[]>([]);
   // 学生名 → 编号（链接里的数字），新学生加入档案时一并保存，下次按编号即可直接识别
   const [studentNoByName, setStudentNoByName] = useState<Record<string, string>>({});
+  // 文章打印页链接：单独管理，不参与学生分组
+  const [articleLinks, setArticleLinks] = useState<ArticleLinkEntry[]>([]);
 
   const toggleExpand = useCallback((idx: number) => {
     setExpanded((prev) => {
@@ -201,19 +217,44 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
       setGroups([]);
       setNameAliases([]);
       setStudentNoByName({});
+      setArticleLinks([]);
       return;
     }
+
+    // ---- 先把「文章打印页」链接摘出来 ----
+    // 这类页面没有学生名，只有文章标题。若混进下面的学生名识别，
+    // 会把文章标题（如 Cat）误当成学生名，凭空多出一个"学生"。
+    const articleUrlList = urls.filter((u) => isArticleListUrl(u));
+    const normalUrls = urls.filter((u) => !isArticleListUrl(u));
+
+    if (articleUrlList.length > 0) {
+      setArticleLinks((prev) => {
+        // 保留已填过的学生名（重新解析时不丢）
+        const prevMap = new Map(prev.map((a) => [a.url, a]));
+        return articleUrlList.map((url) => prevMap.get(url) || { url, studentName: '' });
+      });
+    } else {
+      setArticleLinks([]);
+    }
+
     setParseError('');
     setResults([]);
     setNameAliases([]);
     setStudentNoByName({});
+
+    // 只有普通作业链接才需要识别学生名
+    if (normalUrls.length === 0) {
+      setGroups([]);
+      toast(`识别到 ${articleUrlList.length} 条文章链接，请为每条填写学生名字`);
+      return;
+    }
 
     let names: string[] = [];
     try {
       const res = await fetch('/api/extract-student-names', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls }),
+        body: JSON.stringify({ urls: normalUrls }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -226,7 +267,7 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
     // ---- 识别学生：编号优先，名字兜底 ----
     // 编号（链接里的数字，如 ?id=247343）由系统分配、不会变动，
     // 而学生名可能识别不准或重名，所以编号能对应上就以编号为准。
-    const nos = urls.map((u) => extractStudentNo(u));
+    const nos = normalUrls.map((u) => extractStudentNo(u));
     const archiveStudents = getStudents();
 
     // 名字兜底：识别到的常是「龚浩博」这种带姓全名，
@@ -241,7 +282,7 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
     });
 
     // 每个链接最终归属的学生名
-    const resolvedNames = urls.map((_, i) => {
+    const resolvedNames = normalUrls.map((_, i) => {
       const no = nos[i];
       if (no) {
         const byNo = findStudentByNo(no, archiveStudents);
@@ -257,7 +298,7 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
     //          ② 档案里的对应关系是错的。
     // 这种情况仍以编号为准（编号本应最可靠），但必须明确提示，避免作业错发给别人。
     const noConflicts: string[] = [];
-    urls.forEach((_, i) => {
+    normalUrls.forEach((_, i) => {
       const no = nos[i];
       if (!no) return;
       const byNo = findStudentByNo(no, archiveStudents);
@@ -275,7 +316,7 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
     // 界面提示：识别名被换成了档案里的哪个名字（含按编号命中的情况）
     const aliases: { detected: string; archive: string }[] = [];
     const aliasSeen = new Set<string>();
-    urls.forEach((_, i) => {
+    normalUrls.forEach((_, i) => {
       const rawName = (names[i] || '').trim();
       const resolved = resolvedNames[i];
       if (!rawName || !resolved || rawName === resolved) return;
@@ -292,8 +333,8 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
     let current = '';
     let unnamed = 0;
 
-    for (let i = 0; i < urls.length; i++) {
-      const url = urls[i].trim();
+    for (let i = 0; i < normalUrls.length; i++) {
+      const url = normalUrls[i].trim();
       const name = resolvedNames[i];
       if (name) current = name;
 
@@ -346,6 +387,8 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
       toast(`注意：${desc}，请确认是否为同一名学生${dupHint}`);
     } else if (order.some((g) => g.name === '(未识别学生)')) {
       toast(`部分链接未识别到学生名，请在下方手动填写${dupHint}`);
+    } else if (articleUrlList.length > 0) {
+      toast(`已按 ${order.length} 名学生分组；另有 ${articleUrlList.length} 条文章链接需填写学生名`);
     } else {
       toast(`已按 ${order.length} 名学生分组${dupHint}`);
     }
@@ -414,7 +457,13 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
 
   // --------------- 逐个学生生成 PDF + 群消息（实时进度） ---------------
   const handleGenerate = useCallback(async () => {
-    if (groups.length === 0) return;
+    const validArticles = articleLinks.filter((a) => a.studentName.trim());
+    const unnamedArticles = articleLinks.length - validArticles.length;
+
+    if (groups.length === 0 && validArticles.length === 0) {
+      if (articleLinks.length > 0) toast('请先为文章链接填写学生名字');
+      return;
+    }
     const formatted = formatMMDD(date);
     if (!formatted) {
       toast('日期格式无效');
@@ -499,9 +548,56 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
       }
     }
 
+    // ---- 文章打印页链接：用各自指定的学生名生成 ----
+    for (const a of validArticles) {
+      const name = a.studentName.trim();
+      setResults((prev) => [
+        ...prev,
+        { studentName: `${name}（文章）`, sessionId: '', files: [], message: '', generating: true },
+      ]);
+      try {
+        const res = await fetch('/api/generate-homework-pdfs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ studentName: name, date: formatted, link1: a.url }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          failCount++;
+          setResults((prev) =>
+            prev.map((r, i) => (i === prev.length - 1 ? { ...r, generating: false, error: err.error || `生成失败 (${res.status})` } : r))
+          );
+          continue;
+        }
+        const data = await res.json();
+        const result: StudentResult = {
+          studentName: `${name}（文章）`,
+          sessionId: data.sessionId,
+          files: data.files,
+          message: '',
+        };
+        setResults((prev) => prev.map((r, i) => (i === prev.length - 1 ? result : r)));
+        incrementTotalHomeworkCount();
+        const st = getStudents().find((s) => s.name === name);
+        if (st) recordStudentUsage(st.id);
+      } catch {
+        failCount++;
+        setResults((prev) =>
+          prev.map((r, i) => (i === prev.length - 1 ? { ...r, generating: false, error: '生成请求异常，请重试' } : r))
+        );
+      }
+    }
+
     setGenerating(false);
-    toast(failCount ? `生成完成，${failCount} 名学生失败` : `已为 ${groups.length} 名学生生成作业`);
-  }, [groups, date, toast]);
+    const total = groups.length + validArticles.length;
+    if (unnamedArticles > 0) {
+      toast(`已处理 ${total} 项，另有 ${unnamedArticles} 条文章链接未填学生名`);
+    } else if (failCount) {
+      toast(`生成完成，${failCount} 项失败`);
+    } else {
+      toast(`已为 ${total} 项生成作业`);
+    }
+  }, [groups, articleLinks, date, toast]);
 
   // --------------- 下载 ---------------
   const downloadSingle = useCallback((sessionId: string, fileName: string) => {
@@ -604,9 +700,22 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
           <button
             className="btn btn-primary"
             onClick={handleGenerate}
-            disabled={groups.length === 0 || generating}
+            disabled={
+              generating ||
+              (groups.length === 0 && articleLinks.filter((x) => x.studentName.trim()).length === 0)
+            }
           >
-            {generating ? '正在生成...' : `为 ${groups.length} 名学生生成`}
+            {generating
+              ? '正在生成...'
+              : (() => {
+                  const a = articleLinks.filter((x) => x.studentName.trim()).length;
+                  const total = groups.length + a;
+                  if (total === 0) return articleLinks.length > 0 ? '请先填写文章的学生名' : '生成';
+                  const parts: string[] = [];
+                  if (groups.length > 0) parts.push(`${groups.length} 名学生`);
+                  if (a > 0) parts.push(`${a} 条文章`);
+                  return `为 ${parts.join(' + ')} 生成`;
+                })()}
           </button>
           <button
             className="btn btn-ghost"
@@ -626,6 +735,58 @@ export function BatchHomeworkTab({ toast, onCopy }: Props) {
 
         {parseError && <div style={{ color: 'var(--danger)', fontSize: '.85rem', marginTop: 10 }}>{parseError}</div>}
       </div>
+
+      {/* 文章打印页链接：单独区域，不参与学生分组 */}
+      {articleLinks.length > 0 && (
+        <div className="card" style={{ borderColor: 'var(--accent)' }}>
+          <div className="card-title">
+            文章打印页（{articleLinks.length} 条）
+            <span className="hint" style={{ fontWeight: 400, marginLeft: 8 }}>
+              这类链接里没有学生名，需单独指定
+            </span>
+          </div>
+          <div className="hint" style={{ marginBottom: 12 }}>
+            页面上只有文章标题。请为每条链接填写学生名字，PDF 会按
+            <strong>「学生名-日期-文章名」</strong>命名，一条链接生成一份 PDF。
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {articleLinks.map((item, idx) => (
+              <div
+                key={item.url}
+                style={{
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: '10px 12px',
+                  background: 'var(--tag-bg)',
+                }}
+              >
+                <div className="hint" style={{ wordBreak: 'break-all', marginBottom: 8, fontSize: '.75rem' }}>
+                  {idx + 1}. {item.url}
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input
+                    type="text"
+                    className="hw-name-input"
+                    style={{ flex: '1 1 160px', minWidth: 120 }}
+                    placeholder="输入该链接的学生名"
+                    value={item.studentName}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setArticleLinks((prev) =>
+                        prev.map((a) => (a.url === item.url ? { ...a, studentName: v } : a))
+                      );
+                    }}
+                  />
+                  <span className="hint" style={{ fontSize: '.75rem' }}>
+                    → 生成「{item.studentName.trim() || '学生名'}-{formatMMDD(date) || 'MMDD'}-文章名.pdf」
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 分组预览（可修正学生名） */}
       {groups.length > 0 && (

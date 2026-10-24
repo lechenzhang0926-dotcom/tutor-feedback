@@ -314,11 +314,12 @@ export async function POST(request: NextRequest) {
               return out;
             }).catch(() => [] as string[]);
 
-            // 文件名用第一篇的标题（例如 "Cat"）
-            const primary = sanitizeFileNamePart(titles[0] || '');
-            // 若这一页确实包含多篇不同文章，补上「等N篇」让文件名不误导
-            const articleName = primary
-              ? (titles.length > 1 ? `${primary}等${titles.length}篇` : primary)
+            // 文件名列出页面上所有文章名，多篇用「、」连接。
+            // 注意：不能用 "/" 分隔 —— Windows / macOS 文件名不允许该字符，
+            // 写盘会直接失败；「、」在视觉上最接近用户习惯的写法且完全合法。
+            const cleanedTitles = titles.map((t) => sanitizeFileNamePart(t)).filter(Boolean);
+            const articleName = cleanedTitles.length > 0
+              ? cleanedTitles.join('、')
               : `文章${index + 1}`;
 
             // 同名学生/同名文章去重
