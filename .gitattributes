@@ -1,0 +1,14 @@
+# 统一换行符：避免 Windows 上 checkout 后 shell 脚本带 CRLF，
+# 导致在 Linux 服务器上执行时报 "bad interpreter: /bin/bash^M"
+*.sh   text eol=lf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# Dockerfile 用 LF（Linux 容器里执行）
+Dockerfile text eol=lf
+
+# 二进制文件不做转换
+*.png  binary
+*.jpg  binary
+*.pdf  binary
