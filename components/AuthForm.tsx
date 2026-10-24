@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 
 interface Props {
@@ -16,6 +16,31 @@ export function AuthForm({ onLogin }: Props) {
   const [error, setError] = useState('');
   const [isRegister, setIsRegister] = useState(false);
 
+  // 邀请码是否已启用？
+  // null = 还在探测；true = 数据库里已执行 invite-codes.sql；false = 还没启用
+  // 这样设计的好处：没跑 SQL 时，注册流程与原来完全一致（不出现邀请码输入框），
+  // 一旦在 Supabase 里执行了脚本，页面下次打开就自动开始要求邀请码，无需重新发版。
+  const [inviteEnabled, setInviteEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!supabase || inviteEnabled !== null) return;
+    let cancelled = false;
+    void (async () => {
+      const { error: probeErr } = await supabase!.rpc('validate_invite_code', {
+        p_code: '__probe__',
+      });
+      if (cancelled) return;
+      // PGRST202 = 找不到这个函数 → 说明还没跑 invite-codes.sql
+      const missing =
+        !!probeErr &&
+        (probeErr.code === 'PGRST202' || /Could not find the function/i.test(probeErr.message));
+      setInviteEnabled(!missing);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [inviteEnabled]);
+
   const handleSubmit = useCallback(async () => {
     if (!supabase) {
       setError('登录服务未配置');
@@ -25,7 +50,7 @@ export function AuthForm({ onLogin }: Props) {
       setError('请填写邮箱和密码');
       return;
     }
-    if (isRegister && !inviteCode.trim()) {
+    if (isRegister && inviteEnabled && !inviteCode.trim()) {
       setError('请填写邀请码');
       return;
     }
@@ -37,23 +62,25 @@ export function AuthForm({ onLogin }: Props) {
       if (isRegister) {
         const code = inviteCode.trim().toUpperCase();
 
-        // 先本地问一下服务端这个码能不能用，好在提交前给出明确提示
-        // （真正的把关在数据库触发器里，这里只是让错误信息更友好）
-        const { data: codeOk, error: checkErr } = await supabase.rpc('validate_invite_code', {
-          p_code: code,
-        });
-        if (checkErr) {
-          // RPC 不存在或网络问题时，不阻断注册，交由数据库触发器判断
-          console.warn('[AuthForm] 邀请码预校验失败，继续尝试注册:', checkErr.message);
-        } else if (codeOk === false) {
-          throw new Error('邀请码无效或已用完，请向管理员确认');
+        if (inviteEnabled && code) {
+          // 先问一下服务端这个码能不能用，好在提交前给出明确提示
+          // （真正的把关在数据库触发器里，这里只是让错误信息更友好）
+          const { data: codeOk, error: checkErr } = await supabase.rpc('validate_invite_code', {
+            p_code: code,
+          });
+          if (checkErr) {
+            // RPC 异常时不阻断注册，交由数据库触发器做最终判断
+            console.warn('[AuthForm] 邀请码预校验失败，继续尝试注册:', checkErr.message);
+          } else if (codeOk === false) {
+            throw new Error('邀请码无效或已用完，请向管理员确认');
+          }
         }
 
         const { error: signUpError } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
           options: {
-            data: { invite_code: code },
+            data: inviteEnabled && code ? { invite_code: code } : {},
           },
         });
         if (signUpError) throw signUpError;
@@ -91,7 +118,7 @@ export function AuthForm({ onLogin }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [email, password, inviteCode, isRegister, keepLoggedIn, onLogin]);
+  }, [email, password, inviteCode, isRegister, keepLoggedIn, onLogin, inviteEnabled]);
 
   return (
     <div className="auth-page">
@@ -124,7 +151,7 @@ export function AuthForm({ onLogin }: Props) {
             />
           </div>
 
-          {isRegister && (
+          {isRegister && inviteEnabled === true && (
             <div className="field">
               <label>邀请码</label>
               <input
