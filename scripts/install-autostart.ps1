@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 $apDir    = 'C:\Users\33696\Projects\tutor-feedback'
 $launcher = Join-Path $apDir 'scripts\start-server-for-system.cmd'
 $taskName = 'TutorFeedback'
+$startupDir = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Startup'
 
 # ---------- admin check ----------
 $id = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -30,6 +31,19 @@ if (-not (Test-Path $launcher)) {
 }
 if (-not (Test-Path (Join-Path $apDir '.next\BUILD_ID'))) {
     Write-Host '[WARN] .next\BUILD_ID missing - run "npm run build" first' -ForegroundColor Yellow
+}
+
+# ---------- retire the Startup-folder launcher, if present ----------
+# The scheduled task becomes the single entry point, so the .vbs in the
+# Startup folder is renamed aside to avoid two competing starters.
+$vbs = Join-Path $startupDir 'tutor-autostart.vbs'
+if (Test-Path $vbs) {
+    try {
+        Move-Item -Path $vbs -Destination ($vbs + '.disabled') -Force
+        Write-Host '[INFO] Startup-folder launcher disabled (renamed to .disabled)'
+    } catch {
+        Write-Host "[WARN] Could not rename startup launcher: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 # ---------- register task ----------
@@ -88,4 +102,4 @@ if ($t) {
 
 Write-Host ''
 Write-Host 'Done. The site starts at boot, no login needed, no window shown.'
-Write-Host 'To let the task take over right now, run scripts\start-now.bat as administrator.'
+Write-Host ('Logs: ' + (Join-Path $apDir 'logs\launcher.log'))
